@@ -1,0 +1,10 @@
+bin/
+*.exe
+.env
+.env.*
+!.env.example
+data/
+tmp/
+node_modules/
+.DS_Store
+*.log
