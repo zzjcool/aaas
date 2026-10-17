@@ -118,8 +118,11 @@ jobs:
           fi
           echo "OK  no tool download dir (rg/fd baked in)"
           SH
-          docker run --rm -v /tmp/selfcheck.sh:/tmp/selfcheck.sh:ro \
-            aaas-qa:ci bash /tmp/selfcheck.sh
+          # --entrypoint is required: the image ENTRYPOINT would otherwise
+          # swallow `bash /tmp/selfcheck.sh` as its own arguments.
+          docker run --rm --entrypoint bash \
+            -v /tmp/selfcheck.sh:/tmp/selfcheck.sh:ro \
+            aaas-qa:ci /tmp/selfcheck.sh
 
       - name: Entrypoint syntax + mount preflight fails closed
         run: |
