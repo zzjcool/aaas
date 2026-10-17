@@ -14,6 +14,11 @@ dist/
 .pi-subagents/
 tmp/
 
-# 覆盖率：baseline 是门禁依据必须入库，报告本身是产物不入库
+# 覆盖率：baseline 是门禁依据必须入库，报告本身是产物不入库。
+# 顺序有语义：git 不会在父目录被整体忽略后再纳入其子文件，必须先取反
+# 目录本身。写反（先 coverage/ 再 !coverage/x.json）会让 baseline 静默不
+# 入库，于是「不下降」规则在 CI 里永远跳过 —— 门禁变成装饰品。
 coverage/
+!coverage/
+coverage/*
 !coverage/coverage-baseline.json
