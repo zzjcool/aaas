@@ -13,3 +13,7 @@ dist/
 .pi/
 .pi-subagents/
 tmp/
+
+# 覆盖率：baseline 是门禁依据必须入库，报告本身是产物不入库
+coverage/
+!coverage/coverage-baseline.json

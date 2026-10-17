@@ -388,11 +388,24 @@ export interface PiAdapterOptions {
 interface RunState {
   finalMessage: AssistantMessage | null;
   lastStreamUsage: TokenUsage | undefined;
-  settled: { aborted: boolean } | null;
+  settled: SettledRecord | null;
   sessionId: string | null;
   sessionFile: string | null;
   model: string | null;
   abortedBySignal: boolean;
+}
+
+/**
+ * `agent_settled` may carry an explicit error. It has to be treated as
+ * authoritative: pi can exit 0 with a "successful" last message while still
+ * reporting that the run failed (provider error mid-stream, tool failure,
+ * retry exhaustion). Ignoring it turns those runs into green records, which is
+ * the worst possible outcome for an unattended scheduler — the operator sees
+ * `succeeded` and stops looking.
+ */
+interface SettledRecord {
+  aborted: boolean;
+  error?: string;
 }
 
 export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
@@ -477,7 +490,10 @@ export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
           break;
         }
         case "agent_settled": {
-          state.settled = { aborted: record.aborted === true };
+          state.settled = {
+            aborted: record.aborted === true,
+            ...(typeof record.error === "string" && record.error.length > 0 ? { error: record.error } : {}),
+          };
           resolveSettled();
           break;
         }
@@ -718,6 +734,14 @@ async function discoverModels(bin: string): Promise<{ models: DiscoveredModel[] 
         ...(typeof record.maxTokens === "number" ? { maxTokens: record.maxTokens } : {}),
       });
     }
+    // An empty list is a failure, not a fact. pi can answer `success:true` with
+    // zero models (no credentials, provider extension not loaded in RPC mode),
+    // and reporting that as "you have no models" makes the UI offer an empty
+    // picker and a run that fails later with a confusing error. Surface it so
+    // the form degrades to free text and the operator sees the real reason.
+    if (models.length === 0) {
+      return { error: "pi reported no models: check credentials and provider extensions" };
+    }
     return { models };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
@@ -763,8 +787,11 @@ function buildResult(state: RunState, exitCode: number | null): AgentRunResult {
   const usage = toTokens(finalMessage?.usage) ?? state.lastStreamUsage;
   const costTotal = costOf(finalMessage?.usage);
   const settledAborted = state.settled?.aborted === true;
-  const okay = !settledAborted && stopReason === "stop" && exitCode === 0;
-  const error = okay ? undefined : explainFailure(stopReason, finalMessage, exitCode, settledAborted);
+  const settledError = state.settled?.error;
+  const okay = !settledAborted && settledError === undefined && stopReason === "stop" && exitCode === 0;
+  const error = okay
+    ? undefined
+    : settledError ?? explainFailure(stopReason, finalMessage, exitCode, settledAborted);
 
   return {
     ok: okay,

@@ -16,8 +16,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && npm --prefix web run typecheck",
     "build": "npm --prefix web run build",
     "test": "node --import tsx --test --test-concurrency=1 'src/**/*.test.ts'",
+    "test:e2e": "node --import tsx --test --test-concurrency=1 'tests/e2e/*.test.ts'",
+    "coverage": "node scripts/coverage-gate.mjs",
     "check": "npm run typecheck && npm run test",
-    "smoke": "node --import tsx scripts/smoke.ts"
+    "smoke": "node --import tsx scripts/smoke.ts",
+    "e2e": "npm run test:e2e"
   },
   "dependencies": {
     "@fastify/static": "^8.2.0",

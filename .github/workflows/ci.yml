@@ -1,0 +1,144 @@
+name: CI
+
+# 质量门禁：每个 PR 必须过
+#   - typecheck（含前端）
+#   - 单元测试 + 覆盖率门禁（基线不下降 + 绝对下限）
+#   - E2E（L1/L2，离线，用 fake pi 跑真实 adapter）
+#   - QA 镜像能构建 + 容器自检通过
+#
+# 不跑真实模型：GitHub Runner 访问不到宿主的接入点。真实模型验证走本地
+# `make e2e-real`（AAAS_E2E_PI=real），或 QA 容器 `make qa-up`。
+# L3 测试文件会在缺少 AAAS_E2E_PI=real 时整体 skip，此处自然跳过。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: typecheck + unit + coverage
+    # 固定版本，不用 ubuntu-latest：该标签会在 runner-images#14748 迁移到
+    # Ubuntu 26，届时需有意迁移而不是被自动升级。
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          check-latest: true
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install web deps
+        run: npm --prefix web ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: unit tests + coverage gate
+        run: node scripts/coverage-gate.mjs
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+  e2e:
+    name: e2e (offline, fake pi)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          check-latest: true
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install web deps
+        run: npm --prefix web ci
+
+      # E2E 里有一个用例断言"构建产物被 serve + SPA fallback"，
+      # 所以必须先构建前端。
+      - name: Build web
+        run: npm run build
+
+      - name: Run L1/L2 e2e
+        run: npm run test:e2e
+
+      - name: Smoke (engine)
+        run: npm run smoke
+
+  qa-image:
+    name: QA image builds + self-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t aaas-qa:ci -f docker/Dockerfile docker
+
+      # 不挂载宿主凭据也能验证的部分：pi 在、插件在、工具链在、入口脚本语法正确。
+      # 接入点相关的自检在容器启动时才有意义，那里需要 --network=host + 凭据。
+      - name: Self-check inside the image
+        run: |
+          set -euo pipefail
+          cat > /tmp/selfcheck.sh <<'SH'
+          set -eu
+          pi --version
+          which rg fd curl
+          rg --version | head -1
+          PLUGIN=/root/.pi/agent/npm/node_modules/pi-any-endpoint
+          test -f "$PLUGIN/package.json" && echo "OK  any-endpoint plugin"
+          if [ -e "$HOME/.pi/agent/bin" ]; then
+            echo "✖ pi downloaded tools into ~/.pi/agent/bin" >&2
+            exit 1
+          fi
+          echo "OK  no tool download dir (rg/fd baked in)"
+          SH
+          docker run --rm -v /tmp/selfcheck.sh:/tmp/selfcheck.sh:ro \
+            aaas-qa:ci bash /tmp/selfcheck.sh
+
+      - name: Entrypoint syntax + mount preflight fails closed
+        run: |
+          set -euo pipefail
+          bash -n docker/entrypoint.sh
+          bash -n docker/wait-ready.sh
+          # No source mount must fail loudly, not start a half-broken server.
+          out="$(docker run --rm aaas-qa:ci \
+            /usr/local/bin/aaas-entrypoint.sh 2>&1 || true)"
+          case "$out" in
+            *"/app"*)
+              echo "OK  entrypoint fails closed without a mount"
+              ;;
+            *)
+              echo "✖ entrypoint did not detect the missing mount" >&2
+              echo "$out" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Makefile targets parse
+        run: make -n help
