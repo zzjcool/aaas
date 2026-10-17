@@ -123,3 +123,4 @@ npm run build        # 构建 web/dist
 - `claude-code` / 直连 API 适配器
 - 会话续跑（同一 job 复用 pi session）
 - API Token 鉴权、多用户、任务依赖（DAG）
+# protection probe
