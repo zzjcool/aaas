@@ -18,6 +18,7 @@ import { Runner } from "../src/core/runner.ts";
 import { Scheduler } from "../src/core/scheduler.ts";
 import { createCronTrigger } from "../src/triggers/cron.ts";
 import { manualTrigger } from "../src/triggers/manual.ts";
+import type { AgentAdapter, AgentConfig } from "../src/shared/types.ts";
 
 const TZ = process.env.AAAS_DEFAULT_TZ ?? "Asia/Shanghai";
 const dir = mkdtempSync(join(tmpdir(), "aaas-smoke-"));
@@ -32,11 +33,14 @@ triggers.register(createCronTrigger({ defaultTimezone: TZ }) as never);
 triggers.register(manualTrigger as never);
 
 const agents = new AgentRegistry();
-agents.register({
+// Typed as AgentAdapter, not `as never`: the cast suppressed contextual typing
+// for the methods, so `input`/`ctx` silently became implicit `any`. It went
+// unnoticed for a long time because scripts/ was not in tsconfig's include.
+const stubAgent: AgentAdapter = {
   type: "pi",
   descriptor: { type: "pi", displayName: "stub pi", description: "smoke stub", fields: [] },
-  validate: () => ({ ok: true, config: { type: "pi", cwd: "/tmp" } }),
-  run: async (input, ctx) => {
+  validate: () => ({ ok: true, config: { type: "pi", cwd: "/tmp" } as AgentConfig }),
+  async run(input, ctx) {
     ctx.log("system", `stub adapter for ${input.jobId}`);
     ctx.log("stdout", `prompt was: ${input.prompt}`);
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -47,7 +51,8 @@ agents.register({
       tokens: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, total: 3 },
     };
   },
-} as never);
+};
+agents.register(stubAgent);
 
 const runner = new Runner({ db, logs, bus, maxConcurrency: 2 });
 const jobs = new JobStore({

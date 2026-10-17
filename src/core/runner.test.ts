@@ -46,12 +46,23 @@ function fakeAdapter(impl: (input: AgentRunInput) => Promise<AgentRunResult> | A
   };
 }
 
-function setup(adapter: FakeAdapter) {
+/**
+ * `retryDelayFloorMs` defaults to 1ms so most tests stay fast, but a test about
+ * the backoff window itself must pass a real delay: a 1ms window cannot expose
+ * a race that in production lasts 30s (the default retryBackoffMs).
+ */
+function setup(adapter: FakeAdapter, runnerOptions: { retryDelayFloorMs?: number } = {}) {
   const dir = tempDir();
   const db = new Db(join(dir, "aaas.db"));
   const logs = new LogStore(dir);
   const bus = new EventBus();
-  const runner = new Runner({ db, logs, bus, maxConcurrency: 2, retryDelayFloorMs: 1 });
+  const runner = new Runner({
+    db,
+    logs,
+    bus,
+    maxConcurrency: 2,
+    retryDelayFloorMs: runnerOptions.retryDelayFloorMs ?? 1,
+  });
   return { dir, db, logs, bus, runner, adapter };
 }
 
@@ -113,6 +124,50 @@ test("failed run retries once and records the attempt count", async () => {
     assert.equal(stored.attempt, 2);
     assert.equal(adapter.calls.length, 2);
     assert.match(stored.error ?? "", /boom 2/);
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cancel during the retry backoff actually cancels", async () => {
+  // Regression: #attempt deletes the abort controller in its own finally, and
+  // cancelJob() only scanned #aborts + #queue. During the backoff sleep the
+  // run was in neither, so `POST /jobs/:id/cancel` answered {cancelled:0} and
+  // the retry fired anyway — flipping the run from failed back to running.
+  // With the default retryBackoffMs (30s) that is a 30-second dead zone.
+  //
+  // The window must be real: with a 1ms floor the race cannot be observed and
+  // the test passes whether or not the bug exists.
+  let attempts = 0;
+  const adapter = fakeAdapter(() => {
+    attempts += 1;
+    return { ok: false, text: "", error: `boom ${attempts}`, exitCode: 1 };
+  });
+  const { runner, db, dir } = setup(adapter, { retryDelayFloorMs: 10_000 });
+  try {
+    const run = runner.triggerRun(
+      { job: makeJob({ retries: 1, retryBackoffMs: 60_000 }), triggerKind: "manual", scheduledFor: null },
+      adapter,
+    );
+    assert.ok(run);
+
+    // Wait for attempt 1 to fail and the backoff to start.
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      const live = db.getRun(run.id);
+      if (live?.status === "failed" && attempts === 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(attempts, 1, "attempt 1 must have failed and be waiting to retry");
+
+    const cancelled = runner.cancelJob("job-1");
+    assert.equal(cancelled, 1, "a run waiting to retry must be cancellable");
+
+    await settle(runner);
+    const stored = db.getRun(run.id);
+    assert.equal(stored?.status, "cancelled", "must not silently retry after cancel");
+    assert.equal(attempts, 1, "the retry must never have fired");
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });
