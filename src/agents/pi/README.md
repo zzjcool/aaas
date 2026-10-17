@@ -88,14 +88,15 @@ package layout. Only `node:child_process`, `node:fs`, `node:path` are used.
    run is a fresh `--no-session` process.
 9. **`--no-session` makes `sessionFile` null.** `get_state` still returns a
    `sessionId`; a persisted transcript path only exists for saved sessions.
-10. **Provider registered by an extension ⇒ `extensions: true` is required.**
+10. **Most model providers come from an extension — so extensions stay on.**
     On a stock install, many providers (e.g. `any-endpoint` or custom gateways)
-    are registered by a pi *extension*, not built in. This adapter passes
-    `--no-extensions` by default for deterministic unattended runs, so such a
-    job fails with `No API key found for the selected model`. That is expected
-    behaviour, not a bug: set `extensions: true` in the job's agent config (the
-    auto-answering from pitfall 5 keeps that safe), or use a built-in provider
-    whose API key is provided through `env`.
+    are registered by a pi *extension*, not built in. An earlier revision of
+    this adapter defaulted to `--no-extensions` for determinism, which turned a
+    normal job into `No API key found for the selected model` — the single most
+    confusing failure for a new user. The default is now to inherit the
+    operator's environment; set `extensions: false` when you want a hermetic
+    run. Unattended safety does not depend on it (pitfall 5 auto-answers every
+    dialog, and the child is a separate process with a wall-clock timeout).
 
 ## Config → argv
 

@@ -42,6 +42,13 @@ jobs/*.yaml                      父会话（示例任务）
 
 **禁止**：修改 `package.json`、`tsconfig*.json`、`src/shared/types.ts`、别人名下的文件。需要新依赖 → 报告父会话。
 
+### pi 适配器默认值（重要）
+
+- `extensions` 不设 → **不传 `--no-extensions`**（继承 pi 正常环境，扩展注册的 provider 可用）。显式 `extensions: false` 才封闭。
+- `mcp` 不设 → 传 `--no-mcp`（MCP 需显式开启）。
+- 每次运行 `--no-session`（全新会话）。
+- 所有扩展 UI 对话框自动应答，保证无人值守不阻塞。
+
 ## 3. Trigger 插件契约
 
 ```ts

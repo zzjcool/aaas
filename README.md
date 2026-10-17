@@ -41,9 +41,8 @@ trigger:
 agent:
   type: pi
   cwd: /root/code/some-repo
-  provider: any-endpoint
-  model: workbuddy/hy4-preview-ioa
   tools: [read, grep, find, ls]
+  # provider/model 可省略 —— 继承 pi 自己的默认（本机是扩展注册的 any-endpoint）
 prompt: |
   检查本仓库昨天的提交，把风险点写进 reports/daily.md。
 timeoutMs: 1800000
@@ -69,6 +68,8 @@ npm run cli -- run nightly-repo-report --wait    # 流式跟日志直到结束
 **pi 用 RPC 模式。** 不是 `--mode json`（assistant 报错时退出码仍是 0）、不是 print（拿不到工具事件与 usage）、不是 SDK 内嵌（扩展 provider 需要 services 装配，且与宿主共享异常面）。RPC 模式能同时拿到流式事件、真实 abort、session stats，并且可以拦截扩展弹窗（否则无人值守会永久阻塞）。详见 [src/agents/pi/README.md](src/agents/pi/README.md)。
 
 **每次触发 = 全新会话。** 一期不做会话续跑，避免上下文污染跨次任务。
+
+**默认继承 pi 的正常环境。** 不传 `--no-extensions`，所以扩展注册的 provider（如 `pi-any-endpoint`）开箱可用；扩展弹窗会被自动应答，无人值守不会卡死。需要封闭可复现运行时，在 job 里显式写 `extensions: false`。
 
 **错过的时间点不补跑。** 进程重启后，早于启动时刻 60s 的历史触发点直接跳过并记日志，避免一次重启炸出上百个 pi 进程。
 

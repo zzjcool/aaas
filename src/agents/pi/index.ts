@@ -24,6 +24,19 @@ import { PiRpcProcess, type RpcRecord } from "./rpc-client.ts";
  * transcript, and treats `agent_settled` as the end of the run (never
  * `agent_end`, which fires again after retries/compaction).
  *
+ * DESIGN NOTE — extension-dependent providers:
+ *
+ *   A provider registered by an extension (e.g. `pi-any-endpoint`) only exists
+ *   when extensions are loaded. Closing extensions by default therefore turns a
+ *   perfectly normal job into `No API key found for the selected model`, which
+ *   is the single most confusing failure mode for a new user.
+ *
+ *   So the default is to inherit the operator's normal pi environment
+ *   (extensions + skills on, MCP off). Unattended safety does not depend on
+ *   disabling extensions: every extension dialog is auto-answered below, and
+ *   the child runs in its own process with a wall-clock timeout. Set
+ *   `extensions: false` explicitly when you want a hermetic, reproducible run.
+ *
  * KNOWN PIT — providers registered by extensions:
  *   On a stock install many providers (e.g. `any-endpoint`, custom gateways)
  *   are registered by a pi *extension*, not built in. Because this adapter
@@ -138,15 +151,15 @@ const descriptor: PluginDescriptor = {
       key: "extensions",
       label: "Load pi extensions",
       type: "boolean",
-      default: false,
-      help: "Off (default) passes --no-extensions for deterministic unattended runs. Extension dialogs are auto-answered.",
+      default: true,
+      help: "On by default, so extension-provided model providers work. Turn off (--no-extensions --no-skills) for a hermetic run.",
     },
     {
       key: "mcp",
       label: "Connect MCP servers",
       type: "boolean",
       default: false,
-      help: "Off (default) passes --no-mcp.",
+      help: "Off by default (--no-mcp): MCP servers add startup cost and side effects.",
     },
     {
       key: "env",
@@ -198,8 +211,9 @@ function validate(raw: unknown): TriggerValidation<AgentConfig> {
   if (value.appendSystemPrompt !== undefined && value.appendSystemPrompt.length > 0) {
     config.appendSystemPrompt = value.appendSystemPrompt;
   }
-  if (value.extensions === true) config.extensions = true;
-  if (value.mcp === true) config.mcp = true;
+  // `undefined` stays undefined so the adapter falls back to its defaults.
+  if (value.extensions !== undefined) config.extensions = value.extensions;
+  if (value.mcp !== undefined) config.mcp = value.mcp;
   if (value.env !== undefined && Object.keys(value.env).length > 0) config.env = value.env;
 
   return { ok: true, config };
@@ -221,9 +235,11 @@ export function buildPiArgs(config: PiAgentConfig): string[] {
   }
   if (config.noTools) args.push("--no-tools");
   if (config.appendSystemPrompt) args.push("--append-system-prompt", config.appendSystemPrompt);
-  // Deterministic unattended defaults: extensions/skills/MCP are opt-in.
-  if (!config.extensions) args.push("--no-extensions", "--no-skills");
-  if (!config.mcp) args.push("--no-mcp");
+  // Extensions stay ON unless explicitly disabled: extension-registered model
+  // providers are the norm, and dialogs are auto-answered so they cannot hang
+  // an unattended run. MCP is opt-in (startup cost, external side effects).
+  if (config.extensions === false) args.push("--no-extensions", "--no-skills");
+  if (config.mcp !== true) args.push("--no-mcp");
   return args;
 }
 

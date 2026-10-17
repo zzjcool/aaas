@@ -303,13 +303,18 @@ test("buildPiArgs maps config to CLI flags and keeps unattended defaults", async
   assert.ok(args.includes("--tools") && args.includes("read,grep"));
   assert.ok(args.includes("--exclude-tools") && args.includes("bash"));
   assert.ok(args.includes("--append-system-prompt") && args.includes("be brief"));
-  assert.ok(args.includes("--no-extensions"), "extensions are off by default for deterministic runs");
-  assert.ok(args.includes("--no-mcp"));
-  assert.ok(args.includes("--no-skills"));
+  // Extensions stay on by default so extension-registered providers work;
+  // MCP is opt-in. Both are explicit flags, never implicit behaviour.
+  assert.ok(!args.includes("--no-extensions"), "extensions must stay available by default (providers)");
+  assert.ok(!args.includes("--no-skills"));
+  assert.ok(args.includes("--no-mcp"), "MCP is opt-in");
 
-  const open = buildPiArgs({ type: "pi", cwd: "/tmp", extensions: true, mcp: true } as never);
-  assert.ok(!open.includes("--no-extensions"));
-  assert.ok(!open.includes("--no-mcp"));
+  const hermetic = buildPiArgs({ type: "pi", cwd: "/tmp", extensions: false } as never);
+  assert.ok(hermetic.includes("--no-extensions"), "extensions:false must be hermetic");
+  assert.ok(hermetic.includes("--no-skills"));
+
+  const withMcp = buildPiArgs({ type: "pi", cwd: "/tmp", mcp: true } as never);
+  assert.ok(!withMcp.includes("--no-mcp"));
 
   const noTools = buildPiArgs({ type: "pi", cwd: "/tmp", noTools: true } as never);
   assert.ok(noTools.includes("--no-tools"));
