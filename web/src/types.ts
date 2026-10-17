@@ -12,6 +12,7 @@ export type {
   CronPreviewResponse,
   EngineStatus,
   EpochMs,
+  FieldOptionSource,
   FieldSchema,
   HealthResponse,
   JobSpec,
@@ -29,7 +30,15 @@ export type {
   UpsertJobResponse,
 } from "../../src/shared/types.ts";
 
-import type { RunRecord } from "../../src/shared/types.ts";
+import type { FieldOptionSource, RunRecord } from "../../src/shared/types.ts";
+
+/** `GET /api/agents/:type/options` response (contract §5). */
+export interface AgentOptionsResponse {
+  type: string;
+  options: FieldOptionSource[];
+  cachedAt?: number;
+  fresh?: boolean;
+}
 
 /** Log line as returned by `GET /api/runs/:id/log` and the run SSE stream. */
 export interface LogLine {

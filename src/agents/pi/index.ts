@@ -1,8 +1,10 @@
+import { tmpdir } from "node:os";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 import type {
   AgentAdapter,
+  FieldOptionSource,
   AgentConfig,
   AgentRunContext,
   AgentRunInput,
@@ -37,13 +39,12 @@ import { PiRpcProcess, type RpcRecord } from "./rpc-client.ts";
  *   the child runs in its own process with a wall-clock timeout. Set
  *   `extensions: false` explicitly when you want a hermetic, reproducible run.
  *
- * KNOWN PIT — providers registered by extensions:
+ * Providers come from extensions:
  *   On a stock install many providers (e.g. `any-endpoint`, custom gateways)
- *   are registered by a pi *extension*, not built in. Because this adapter
- *   passes `--no-extensions` by default (deterministic unattended runs), such
- *   a job fails with `No API key found for the selected model`. That is
- *   expected: set `extensions: true` to let pi discover extensions, or use a
- *   built-in provider with its API key in `env`. See ./README.md.
+ *   are registered by a pi *extension*, not built in. This adapter therefore
+ *   keeps extensions enabled unless a job sets `extensions: false`. Discovery
+ *   (see `discoverOptions`) launches pi the same way, so the model list the UI
+ *   offers is exactly the list a run will see. See ./README.md.
  */
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -591,13 +592,139 @@ export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
     return buildResult(state, exitCode);
   };
 
+  const discoverOptions = async (): Promise<FieldOptionSource[]> => {
+    const sources: FieldOptionSource[] = [];
+
+    /* ---- models: authoritative, straight from pi ---- */
+    const discovered = await discoverModels(bin);
+    if ("error" in discovered) {
+      sources.push({ key: "model", options: [], source: "pi get_available_models", error: discovered.error });
+    } else {
+      const options = discovered.models.map((model) => {
+        const bits: string[] = [];
+        if (model.provider) bits.push(model.provider);
+        if (model.contextWindow) bits.push(`${formatTokens(model.contextWindow)} ctx`);
+        if (model.maxTokens) bits.push(`${formatTokens(model.maxTokens)} out`);
+        if (model.reasoning) bits.push("thinking");
+        return {
+          value: model.id,
+          label: model.name && model.name !== model.id ? `${model.name} — ${model.id}` : model.id,
+          ...(bits.length > 0 ? { detail: bits.join(" · ") } : {}),
+        };
+      });
+      sources.push({
+        key: "model",
+        options,
+        source: "pi get_available_models",
+        // The provider is implied by the model id, so the UI can set both.
+      });
+      const providers = [...new Set(discovered.models.map((m) => m.provider).filter((p): p is string => typeof p === "string"))];
+      if (providers.length > 0) {
+        sources.push({
+          key: "provider",
+          options: providers.map((provider) => ({ value: provider, label: provider })),
+          source: "pi get_available_models",
+        });
+      }
+    }
+
+    /* ---- thinking: static, mirrors pi's --thinking levels ---- */
+    sources.push({
+      key: "thinking",
+      options: THINKING_LEVELS.map((level) => ({ value: level, label: level })),
+      source: "pi --thinking",
+    });
+
+    /* ---- tools: pi's documented defaults, multi-select ---- */
+    sources.push({
+      key: "tools",
+      multiple: true,
+      options: DEFAULT_PI_TOOLS.map((tool) => ({ value: tool, label: tool })),
+      source: "pi default tools",
+    });
+
+    return sources;
+  };
+
   return {
     type: "pi",
     descriptor,
     validate,
     run,
+    discoverOptions,
   };
 }
+
+/**
+ * Tools pi enables by default (docs/cli.md: "Default enabled tools are `read`,
+ * `bash`, `edit`, and `write`, unless `defaultTools` changes them"). Extension
+ * and MCP tools are extra and cannot be enumerated without loading them, so the
+ * picker offers these plus a free-text escape hatch in the UI.
+ */
+const DEFAULT_PI_TOOLS = ["read", "bash", "edit", "write"] as const;
+
+interface DiscoveredModel {
+  id: string;
+  name?: string;
+  provider?: string;
+  reasoning?: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+}
+
+/**
+ * Ask pi which models it actually has, by starting it once in RPC mode and
+ * issuing `get_available_models`. This is authoritative: it reflects installed
+ * extensions, credentials and `models.json`, so the UI cannot offer a model
+ * that a run would reject.
+ *
+ * Returns `{ error }` instead of throwing: discovery failing must degrade the
+ * form to free text, never break the editor.
+ */
+async function discoverModels(bin: string): Promise<{ models: DiscoveredModel[] } | { error: string }> {
+  const client = new PiRpcProcess({
+    bin,
+    // Extensions on (providers live there) and no MCP (not needed to list models).
+    args: ["--mode", "rpc", "--no-session", "--no-mcp"],
+    cwd: tmpdir(),
+    env: { ...process.env, CI: "1", NO_COLOR: "1", TERM: "dumb" } as Record<string, string | undefined>,
+  });
+  try {
+    await client.start();
+    const response = await client.command("get_available_models", {}, 20_000);
+    if (!response.success) return { error: response.error ?? "get_available_models failed" };
+    const raw = (response.data as { models?: unknown } | undefined)?.models;
+    if (!Array.isArray(raw)) return { error: "unexpected response shape from get_available_models" };
+    const models: DiscoveredModel[] = [];
+    for (const entry of raw) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const record = entry as Record<string, unknown>;
+      if (typeof record.id !== "string" || record.id === "") continue;
+      models.push({
+        id: record.id,
+        ...(typeof record.name === "string" ? { name: record.name } : {}),
+        ...(typeof record.provider === "string" ? { provider: record.provider } : {}),
+        ...(record.reasoning === true ? { reasoning: true } : {}),
+        ...(typeof record.contextWindow === "number" ? { contextWindow: record.contextWindow } : {}),
+        ...(typeof record.maxTokens === "number" ? { maxTokens: record.maxTokens } : {}),
+      });
+    }
+    return { models };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    await client.close().catch(() => null);
+  }
+}
+
+function formatTokens(value: number): string {
+  if (value >= 1_000_000) return `${Math.round(value / 100_000) / 10}M`;
+  if (value >= 1000) return `${Math.round(value / 100) / 10}K`;
+  return String(value);
+}
+
+/** Default singleton adapter, used by the engine registry. */
+export const piAgent: AgentAdapter = createPiAdapter();
 
 /**
  * Translate collected run state into the frozen `AgentRunResult` shape.
@@ -711,8 +838,5 @@ async function readSessionFile(client: PiRpcProcess, timeoutMs: number, ctx: Age
     return null;
   }
 }
-
-/** Default singleton adapter, used by the engine registry. */
-export const piAgent: AgentAdapter = createPiAdapter();
 
 export type { PiAgentConfig, ThinkingLevel };

@@ -7,6 +7,7 @@ import type {
   CronPreviewRequest,
   CronPreviewResponse,
   EngineStatus,
+  FieldOptionSource,
   HealthResponse,
   JobSpec,
   JobView,
@@ -23,6 +24,9 @@ import type { AgentRegistry, TriggerRegistry } from "../core/registry.ts";
 import type { Runner } from "../core/runner.ts";
 import type { Scheduler } from "../core/scheduler.ts";
 import { describeSchedule, nextFire, normalizeSchedule } from "../core/schedule.ts";
+
+/** How long a discovery result is reused before the UI has to ask again. */
+const OPTION_CACHE_MS = 10 * 60_000;
 
 export interface AppDeps {
   db: Db;
@@ -44,6 +48,7 @@ const SSE_HEARTBEAT_MS = 15_000;
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
+  const optionCache = new Map<string, { at: number; options: FieldOptionSource[] }>();
 
   app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, request, reply) => {
     request.log.error(error);
@@ -82,6 +87,40 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.get("/api/triggers", async () => deps.triggers.list());
   app.get("/api/agents", async () => deps.agents.list());
+
+  /**
+   * Runtime choices for an agent's config fields (models, tools, …).
+   *
+   * Cached per process: listing models starts pi once (seconds), and the answer
+   * only changes when the operator installs things. `?refresh=1` bypasses it.
+   */
+  app.get<{ Params: { type: string }; Querystring: { refresh?: string } }>(
+    "/api/agents/:type/options",
+    async (request, reply) => {
+      const type = request.params.type;
+      const adapter = deps.agents.get(type);
+      if (!adapter) return reply.status(404).send({ error: `unknown agent type: ${type}` } satisfies ApiError);
+      if (!adapter.discoverOptions) return { type, options: [] as FieldOptionSource[] };
+
+      const refresh = request.query.refresh === "1" || request.query.refresh === "true";
+      const cached = optionCache.get(type);
+      if (!refresh && cached && Date.now() - cached.at < OPTION_CACHE_MS) {
+        return { type, options: cached.options, cachedAt: cached.at };
+      }
+
+      let options: FieldOptionSource[];
+      try {
+        options = await adapter.discoverOptions();
+      } catch (err) {
+        // Discovery is best-effort: the UI falls back to free text.
+        options = [
+          { key: "*", options: [], error: err instanceof Error ? err.message : String(err) },
+        ] satisfies FieldOptionSource[];
+      }
+      optionCache.set(type, { at: Date.now(), options });
+      return { type, options, cachedAt: Date.now(), fresh: true };
+    },
+  );
 
   /* ---------------------------------------------------------------- */
   /* Jobs                                                              */

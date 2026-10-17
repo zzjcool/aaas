@@ -307,12 +307,34 @@ export interface AgentRunResult {
   model?: string | null;
 }
 
+/**
+ * Runtime-discovered choices for one config field, so the UI can offer a
+ * picker instead of asking people to type an opaque identifier. Discovered from
+ * the agent itself (e.g. `pi` enumerates its configured models), never guessed.
+ */
+export interface FieldOptionSource {
+  /** Config key these options belong to (`model`, `thinking`, `tools`, …). */
+  key: string;
+  options: { value: string; label: string; detail?: string; disabled?: boolean }[];
+  /** Where the list came from, shown in the UI for trust ("pi --list-models"). */
+  source?: string;
+  /** Populated when discovery failed; the field then stays free-text. */
+  error?: string;
+  /** Whether picking several values is allowed (e.g. tools). */
+  multiple?: boolean;
+}
+
 export interface AgentAdapter {
   readonly type: string;
   readonly descriptor: PluginDescriptor;
   /** Validate/normalise adapter config (used for both YAML load and UI forms). */
   validate(raw: unknown): TriggerValidation<AgentConfig>;
   run(input: AgentRunInput, ctx: AgentRunContext): Promise<AgentRunResult>;
+  /**
+   * Optional: enumerate real choices for config fields (models, tools, …).
+   * Called on demand by `GET /api/agents/:type/options`; must never throw.
+   */
+  discoverOptions?(): Promise<FieldOptionSource[]>;
 }
 
 /* ------------------------------------------------------------------ */

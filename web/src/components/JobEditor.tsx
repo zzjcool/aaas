@@ -7,6 +7,7 @@ import type {
   AgentInfo,
   CronPreviewRequest,
   CronPreviewResponse,
+  FieldOptionSource,
   FieldSchema,
   JobSpec,
   JobView,
@@ -15,6 +16,7 @@ import type {
 } from "../types.ts";
 import { CronFieldEditor } from "./CronFieldEditor.tsx";
 import { Field, initialValueFor, type FieldValue } from "./Field.tsx";
+import { OptionControl, useAgentOptions } from "./OptionControl.tsx";
 import { TimezoneField } from "./TimezoneField.tsx";
 import { Modal } from "./Modal.tsx";
 
@@ -114,6 +116,38 @@ function defaultConfigFor(plugin: { fields: FieldSchema[] } | undefined): Record
     }
   }
   return config;
+}
+
+interface AgentOptionArgs {
+  options: Record<string, FieldOptionSource>;
+  value: FieldValue | undefined;
+  disabled: boolean;
+  onChange: (next: string | string[] | undefined) => void;
+  onDerive: (patch: Record<string, string>) => void;
+}
+
+/**
+ * Turn a config field into a picker when the adapter reported choices for its
+ * key. Everything else keeps the generic control, so an adapter without
+ * `discoverOptions` is unaffected.
+ */
+function agentOptionProps(
+  schema: FieldSchema,
+  args: AgentOptionArgs,
+): { renderCustom?: () => React.ReactNode } {
+  const source = args.options[schema.key];
+  if (!source) return {};
+  return {
+    renderCustom: () => (
+      <OptionControl
+        source={source}
+        value={args.value}
+        onChange={args.onChange}
+        disabled={args.disabled}
+        onDerive={args.onDerive}
+      />
+    ),
+  };
 }
 
 /** First required-but-empty field, phrased for a toast. */
@@ -323,6 +357,11 @@ export function JobEditor({
 
   const triggerFields = triggerPlugin?.fields ?? [];
   const agentFields = agentPlugin?.fields ?? [];
+
+  // Real choices from the agent itself (models, thinking levels, default tools).
+  const { options: agentOptions, loading: optionsLoading, error: optionsError, refresh: refreshOptions } =
+    useAgentOptions(form.agentType);
+  const agentOptionsState = { loading: optionsLoading, error: optionsError, refresh: refreshOptions };
 
   const patch = useCallback((next: Partial<FormState>) => {
     setForm((prev) => ({ ...prev, ...next }));
@@ -698,8 +737,29 @@ export function JobEditor({
             onChange={(value) => setAgentField(schema.key, value)}
             errors={errorsFor(`agent.${schema.key}`)}
             disabled={busy}
+            {...agentOptionProps(schema, {
+              options: agentOptions,
+              value: form.agentConfig[schema.key],
+              disabled: busy,
+              onChange: (next) => setAgentField(schema.key, next as FieldValue),
+              onDerive: (patch) => {
+                for (const [key, value] of Object.entries(patch)) setAgentField(key, value);
+              },
+            })}
           />
         ))}
+
+        {agentOptionsState.loading && Object.keys(agentOptions).length === 0 ? (
+          <p className="field__help">Discovering models from pi…</p>
+        ) : null}
+        {agentOptionsState.error ? (
+          <p className="field__help">
+            Could not list options ({agentOptionsState.error}) — the fields stay free-text.{" "}
+            <button type="button" className="link-btn" onClick={agentOptionsState.refresh} disabled={busy}>
+              Retry
+            </button>
+          </p>
+        ) : null}
       </section>
 
       {/* ---------------- prompt ---------------- */}
