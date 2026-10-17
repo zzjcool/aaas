@@ -139,6 +139,13 @@ test("trigger and agent plugins are discoverable with form descriptors", async (
     assert.deepEqual(triggers.map((t: { type: string }) => t.type).sort(), ["cron", "manual"]);
     const cron = triggers.find((t: { type: string }) => t.type === "cron");
     assert.ok(cron.fields.some((f: { key: string }) => f.key === "cron"));
+    // The UI renders a visual builder for `format: "cron"`; without this hint
+    // the field degrades to a plain text box and the feature silently vanishes.
+    const cronField = cron.fields.find((f: { key: string }) => f.key === "cron");
+    assert.equal(cronField.format, "cron", "cron field must advertise the visual builder");
+    assert.equal(cronField.label, "Schedule");
+    const tzField = cron.fields.find((f: { key: string }) => f.key === "timezone");
+    assert.equal(tzField.format, "timezone");
     assert.ok(cron.fields.some((f: { key: string }) => f.key === "every"));
     assert.ok(cron.fields.some((f: { key: string }) => f.key === "timezone"));
 

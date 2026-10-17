@@ -221,6 +221,16 @@ export interface FieldSchema {
   options?: { value: string; label: string }[];
   min?: number;
   max?: number;
+  /**
+   * Optional hint that the raw string has a structure worth editing with a
+   * dedicated control instead of a free-text box. Purely presentational: the
+   * wire value is still the plain string the plugin validates.
+   *
+   * - `cron`: render the visual schedule builder (the text stays editable and
+   *   the value the plugin receives is whatever the builder writes out).
+   * - `timezone`: render a timezone picker backed by `Intl.supportedValuesOf`.
+   */
+  format?: "cron" | "timezone";
 }
 
 export interface PluginDescriptor {

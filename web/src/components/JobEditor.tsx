@@ -13,7 +13,9 @@ import type {
   TriggerConfig,
   TriggerInfo,
 } from "../types.ts";
+import { CronFieldEditor } from "./CronFieldEditor.tsx";
 import { Field, initialValueFor, type FieldValue } from "./Field.tsx";
+import { TimezoneField } from "./TimezoneField.tsx";
 import { Modal } from "./Modal.tsx";
 
 /**
@@ -23,6 +25,9 @@ import { Modal } from "./Modal.tsx";
  */
 const PREVIEW_KEYS = ["cron", "every", "timezone"] as const;
 type PreviewKey = (typeof PREVIEW_KEYS)[number];
+
+/** Seed for a required, empty cron field in create mode: every day at 09:00. */
+const DEFAULT_CRON = "0 9 * * *";
 
 const PREVIEW_DEBOUNCE_MS = 400;
 const PREVIEW_COUNT = 5;
@@ -90,9 +95,59 @@ function defaultConfigFor(plugin: { fields: FieldSchema[] } | undefined): Record
   const config: Record<string, FieldValue> = {};
   for (const field of plugin?.fields ?? []) {
     const value = initialValueFor(field);
-    if (value !== undefined) config[field.key] = value;
+    if (value !== undefined) {
+      config[field.key] = value;
+      continue;
+    }
+    // A brand-new job with an empty cron field shows nothing but a warning,
+    // which is the least helpful possible starting point. Seed a benign
+    // schedule so the builder opens fully populated and every control is live.
+    if (field.format === "cron") {
+      config[field.key] = DEFAULT_CRON;
+    }
+    // A required free-text field (e.g. the agent's working directory) is the
+    // other guaranteed stumble. Prefill the most plausible value so "Create"
+    // does not fail on the very first try.
+    if (field.format === undefined && field.required === true && field.type === "string" && field.default === undefined) {
+      const guess = guessRequiredString(field);
+      if (guess !== undefined) config[field.key] = guess;
+    }
   }
   return config;
+}
+
+/** First required-but-empty field, phrased for a toast. */
+function missingRequired(
+  fields: FieldSchema[],
+  config: Record<string, FieldValue>,
+  section: "trigger" | "agent",
+): string | null {
+  for (const field of fields) {
+    if (field.required !== true) continue;
+    const value = config[field.key];
+    const empty =
+      value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim() === "") ||
+      (Array.isArray(value) && value.length === 0);
+    if (empty) return `${section} · ${field.label || field.key} is required.`;
+  }
+  return null;
+}
+
+/**
+ * Plausible initial value for a required string field, keyed by what the field
+ * means rather than by which plugin declared it.
+ */
+function guessRequiredString(field: FieldSchema): string | undefined {
+  const key = field.key.toLowerCase();
+  if (key === "cwd" || key === "workdir" || key === "dir" || key === "directory") {
+    return "/tmp";
+  }
+  if (key === "path" || key === "file" || key === "script") {
+    return "/tmp";
+  }
+  return undefined;
 }
 
 function formFromJob(job: JobView): FormState {
@@ -381,7 +436,20 @@ export function JobEditor({
 
   /* ---------------- actions ---------------- */
 
+  /** Client-side pre-flight: fail loudly on the obvious gap instead of a 422. */
+  const blockedReason = useMemo(() => {
+    if (spec.id.trim() === "") return "ID is required.";
+    if (form.prompt.trim() === "") return "Prompt is required — the agent needs instructions.";
+    const missing = missingRequired(triggerFields, form.triggerConfig, "trigger");
+    if (missing) return missing;
+    return missingRequired(agentFields, form.agentConfig, "agent");
+  }, [agentFields, form.agentConfig, form.prompt, spec.id, triggerFields, form.triggerConfig]);
+
   const onSave = useCallback(async () => {
+    if (blockedReason) {
+      notify("warn", blockedReason);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -400,7 +468,7 @@ export function JobEditor({
     } finally {
       setSaving(false);
     }
-  }, [isEdit, job, spec, notify, onSaved]);
+  }, [blockedReason, isEdit, job, spec, notify, onSaved]);
 
   const onDelete = useCallback(async () => {
     if (!job) return;
@@ -575,15 +643,22 @@ export function JobEditor({
             onChange={(value) => setTriggerField(schema.key, value)}
             errors={errorsFor(`trigger.${schema.key}`)}
             disabled={busy}
+            {...renderTriggerControl(schema, {
+              value: form.triggerConfig[schema.key],
+              timezone: jobTimezone,
+              fallbackTimezone: defaultTimezone,
+              disabled: busy,
+              errors: errorsFor(`trigger.${schema.key}`),
+              onChange: (next) => setTriggerField(schema.key, next),
+              preview: previewRequest ? (
+                <SchedulePreview preview={preview} loading={previewLoading} jobTimezone={jobTimezone} />
+              ) : null,
+            })}
           />
         ))}
 
-        {previewRequest ? (
-          <SchedulePreview
-            preview={preview}
-            loading={previewLoading}
-            jobTimezone={jobTimezone}
-          />
+        {previewRequest && triggerFields.every((schema) => schema.format !== "cron") ? (
+          <SchedulePreview preview={preview} loading={previewLoading} jobTimezone={jobTimezone} />
         ) : null}
       </section>
 
@@ -800,6 +875,63 @@ function buildPreviewRequest(
   }
   // Without a cron/every value the server would just echo an error; wait for input.
   return meaningful ? request : null;
+}
+
+interface TriggerControlArgs {
+  value: FieldValue | undefined;
+  timezone: string;
+  fallbackTimezone: string;
+  disabled: boolean;
+  errors: string[];
+  onChange: (next: FieldValue) => void;
+  preview: React.ReactNode;
+}
+
+/**
+ * Map a descriptor `format` hint to a richer control. Everything else falls
+ * through to the generic schema-driven `Field` renderer, so plugins that only
+ * declare scalar types are unaffected.
+ */
+function renderTriggerControl(
+  schema: FieldSchema,
+  args: TriggerControlArgs,
+): { renderCustom?: () => React.ReactNode } {
+  if (schema.format === "cron") {
+    return {
+      renderCustom: () => (
+        <CronFieldEditor
+          value={asString(args.value)}
+          onChange={args.onChange}
+          timezone={args.timezone}
+          disabled={args.disabled}
+          errors={args.errors}
+        >
+          {args.preview}
+        </CronFieldEditor>
+      ),
+    };
+  }
+  if (schema.format === "timezone") {
+    return {
+      renderCustom: () => (
+        <TimezoneField
+          value={asString(args.value)}
+          onChange={args.onChange}
+          fallback={args.fallbackTimezone}
+          disabled={args.disabled}
+          errors={args.errors}
+        />
+      ),
+    };
+  }
+  return {};
+}
+
+/** Render an unset field value as "" for text-based custom controls. */
+function asString(value: FieldValue | undefined): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return "";
 }
 
 function previewTimezone(

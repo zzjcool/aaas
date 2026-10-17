@@ -42,6 +42,16 @@ jobs/*.yaml                      父会话（示例任务）
 
 **禁止**：修改 `package.json`、`tsconfig*.json`、`src/shared/types.ts`、别人名下的文件。需要新依赖 → 报告父会话。
 
+### 字段呈现提示：`FieldSchema.format`
+
+`FieldSchema` 有一个可选 `format` 字段，纯表现层提示，wire 值仍是普通字符串：
+
+- `format: "cron"` → 前端渲染可视化排程构建器（预设 + 分钟/小时/星期控件 + 表达式回显），
+  表达式不适合建模时自动降级为纯文本编辑，**永不篡改用户输入**。
+- `format: "timezone"` → 前端渲染基于 `Intl.supportedValuesOf('timeZone')` 的时区选择器。
+
+插件声明了这个提示，UI 才能给出合适的控件；不声明就退化成普通输入框，功能不会坏。
+
 ### pi 适配器默认值（重要）
 
 - `extensions` 不设 → **不传 `--no-extensions`**（继承 pi 正常环境，扩展注册的 provider 可用）。显式 `extensions: false` 才封闭。

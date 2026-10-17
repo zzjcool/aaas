@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { FieldSchema } from "../types.ts";
 
 /**
@@ -15,6 +16,12 @@ export interface FieldProps {
   disabled?: boolean;
   /** Namespace for DOM ids so two plugins with the same key stay unique. */
   idPrefix?: string;
+  /**
+   * Optional replacement for the scalar control, used for `schema.format`
+   * hints (a cron builder is much more usable than a text box). The wrapper —
+   * label, help text, error slot — stays the same, so layout is unaffected.
+   */
+  renderCustom?: () => ReactNode;
 }
 
 /**
@@ -23,7 +30,15 @@ export interface FieldProps {
  * Deliberately schema-driven: the trigger and agent panels never hard-code
  * field names, so a new plugin's descriptor renders without UI changes.
  */
-export function Field({ schema, value, onChange, errors = [], disabled = false, idPrefix = "" }: FieldProps) {
+export function Field({
+  schema,
+  value,
+  onChange,
+  errors = [],
+  disabled = false,
+  idPrefix = "",
+  renderCustom,
+}: FieldProps) {
   const id = `${idPrefix}${schema.key}`;
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
@@ -37,11 +52,13 @@ export function Field({ schema, value, onChange, errors = [], disabled = false, 
     ...(describedBy ? { "aria-describedby": describedBy } : {}),
   };
 
-  const control = renderControl({ schema, value, onChange, common });
+  const control = renderCustom
+    ? renderCustom()
+    : renderControl({ schema, value, onChange, common });
 
   return (
     <div className={`field${hasError ? " field--error" : ""}`}>
-      <label className="field__label" htmlFor={id}>
+      <label className="field__label" htmlFor={renderCustom ? undefined : id}>
         <span>{schema.label || schema.key}</span>
         {schema.required ? <span className="field__required" title="Required">*</span> : null}
         <code className="field__key">{schema.key}</code>

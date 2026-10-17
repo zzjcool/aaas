@@ -20,10 +20,14 @@ export function createCronTrigger(options: CronTriggerOptions, cache = new Map<s
     fields: [
       {
         key: "cron",
-        label: "Cron expression",
+        label: "Schedule",
         type: "string",
+        format: "cron",
+        // Not strictly required: `every` is an alternative. Marked so the UI
+        // seeds a usable default instead of opening an empty builder.
+        required: false,
         placeholder: "0 9 * * 1-5",
-        help: "5 fields (min hour dom mon dow), 6 fields (sec min hour dom mon dow), or a macro: @hourly @daily @midnight @weekly @monthly @yearly.",
+        help: "Build it visually, or type a cron expression. 5 fields (min hour dom mon dow), 6 fields (sec min hour dom mon dow), or a macro: @hourly @daily @midnight @weekly @monthly @yearly.",
       },
       {
         key: "every",
@@ -36,6 +40,7 @@ export function createCronTrigger(options: CronTriggerOptions, cache = new Map<s
         key: "timezone",
         label: "Timezone",
         type: "string",
+        format: "timezone",
         default: options.defaultTimezone,
         help: "IANA timezone used to interpret the cron expression. Stored schedules are always epoch milliseconds.",
       },
