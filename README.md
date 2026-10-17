@@ -16,17 +16,46 @@
                                  SQLite + JSONL 日志         pi --mode rpc
 ```
 
+## 前置要求
+
+|依赖|要求|为什么|
+|---|---|---|
+|Node.js|**≥ 22.19**|用内置 `node:sqlite`，低版本跑不起来|
+|前端依赖|`npm --prefix web install`|`web/` 是独立包，根目录 `npm install` **不会**装它|
+|`pi`|已安装并认证|真实 run 通过 `pi --mode rpc` 子进程执行（`AAAS_PI_BIN` 可换路径）|
+|Docker|可选|只有 `make qa-up`（QA 容器）需要|
+
+> 示例里的 `cwd` 请改成你自己机器上的真实目录 —— 写不存在的路径会让 job
+> 变成 `problem` 状态、永远不可运行。
+
 ## 快速开始
 
 ```bash
 npm install
+npm --prefix web install
 npm run dev          # 后端 :7788 + 前端 :5173（热更新）
-# 或
-npm start            # 只跑后端（已有 web/dist 时会顺带托管 UI）
-npm run cli -- health
+```
+
+`npm run dev` 一条命令同时起后端（`tsx watch`）和前端（vite）。也可以拆成两个终端：
+
+```bash
+npm run dev:server   # 只后端 :7788
+npm run dev:web      # 只前端 :5173（已配好 /api → :7788 代理）
+```
+
+生产模式（单端口，后端同时托管 UI）：
+
+```bash
+npm run build        # 生成 web/dist
+npm start            # :7788
 ```
 
 打开 http://127.0.0.1:5173 （dev）或 http://127.0.0.1:7788 （生产构建后）。
+服务起来之后 CLI 才能连通：
+
+```bash
+npm run cli -- health
+```
 
 创建一个任务：UI 里点 **New job**，或者直接写 `jobs/<id>.yaml`：
 
@@ -95,17 +124,17 @@ docs/contract.md         冻结契约（并行施工依据）
 
 ## 环境变量
 
-| 变量 | 默认 | 说明 |
+|变量|默认|说明|
 |---|---|---|
-| `AAAS_PORT` | 7788 | HTTP 端口 |
-| `AAAS_HOST` | 127.0.0.1 | 绑定地址 |
-| `AAAS_DATA_DIR` | ./data | SQLite 与运行日志 |
-| `AAAS_JOBS_DIR` | ./jobs | YAML 任务目录 |
-| `AAAS_DEFAULT_TZ` | Asia/Shanghai | cron 默认时区 |
-| `AAAS_MAX_CONCURRENCY` | 2 | 全局并发上限 |
-| `AAAS_TICK_MS` | 1000 | 调度 tick |
-| `AAAS_PI_BIN` | pi | pi 可执行文件 |
-| `AAAS_WEB_DIR` | web/dist | 静态 UI 目录 |
+|`AAAS_PORT`|7788|HTTP 端口|
+|`AAAS_HOST`|127.0.0.1|绑定地址|
+|`AAAS_DATA_DIR`|./data|SQLite 与运行日志|
+|`AAAS_JOBS_DIR`|./jobs|YAML 任务目录|
+|`AAAS_DEFAULT_TZ`|Asia/Shanghai|cron 默认时区|
+|`AAAS_MAX_CONCURRENCY`|2|全局并发上限|
+|`AAAS_TICK_MS`|1000|调度 tick|
+|`AAAS_PI_BIN`|pi|pi 可执行文件|
+|`AAAS_WEB_DIR`|web/dist|静态 UI 目录|
 
 ## 开发
 
@@ -115,6 +144,67 @@ npm test             # node --test（无网络、无真实模型）
 npm run check        # 两者都跑
 npm run build        # 构建 web/dist
 ```
+
+### 改动后怎么算验证通过
+
+按成本递增，全绿才推：
+
+```bash
+make ci-local        # ≈ GitHub Actions：typecheck + 单测 + 覆盖率门禁
+                     # + npm audit + 前端构建 + E2E + smoke
+make ci-local-full   # 上面全部 + 重建 QA 镜像
+```
+
+只碰 pi 适配器 / provider / 模型参数时，额外跑真实模型：
+
+```bash
+make e2e-real        # AAAS_E2E_PI=real，走真实 pi（在宿主，需要接入点）
+```
+
+只碰前端或容器时：
+
+```bash
+make qa-restart      # 用当前源码重建 QA 环境
+```
+
+提交信息用 Conventional Commits（`feat:` / `fix:` / `chore:` …），正文写「为什么」。
+改到 REST 路径、环境变量或引擎语义时，同一个 PR 里同步改 `docs/contract.md`。
+
+## QA 怎么测
+
+```bash
+make qa-up           # 用当前工作区源码起环境（改完代码用 make qa-restart）
+make qa-status       # 容器状态 + 健康检查
+make qa-logs         # 容器日志（启动自检在这里）
+make qa-shell        # 进容器排查
+make qa-reset        # 清空数据卷，回到全新环境
+```
+
+起好后浏览器打开 http://127.0.0.1:7788 。
+
+### 冒烟清单（改一次全过一遍，约 5 分钟）
+
+|#|步骤|通过标准|
+|---|---|---|
+|1|打开 UI|顶栏显示版本号，`/api/health` 返回 `ok:true`|
+|2|`make qa-logs`|出现「模型接入点可达」；若说不可达，job 仍能建但 run 会失败|
+|3|建一个 job（UI **New job** 或写 `jobs/*.yaml`）|列表里出现，且显示下一次触发时间|
+|4|点 **Run** 手动触发|run 进入 running，日志有 `spawn … --mode rpc` 行|
+|5|等 run 结束|状态 `succeeded`，`resultText` 是模型的真实回答|
+|6|看 run 详情|日志流完整（含工具调用 `→ tool …`），token 数 > 0|
+|7|关掉再启用 job|关掉后 `nextFireAt` 为 null，不再触发|
+|8|删掉 job|列表消失，`/jobs/*.yaml` 也被删除|
+|9|非法输入（坏 cron、不存在的 `cwd`）|报字段级错误，不是 500，服务不崩|
+|10|run 跑一半点 **Cancel**|状态变 `cancelled`，没有残留进程|
+
+### 怎么判断「模型真的通了」
+
+- `make qa-logs` 里 entrypoint 会打印「模型接入点可达: &lt;baseUrl&gt;」
+- 跑一次真实 run，看 `resultText` 是不是模型回答（不是错误信息）
+- `make qa-shell` 后 `pi --list-models` 应列出 `workbuddy/hy4-preview-ioa`
+
+> 注意：QA 容器用 `--network=host` 且监听 `0.0.0.0`，而服务本身没有鉴权。
+> 只在可信网络里跑，不要直接暴露到公网。
 
 ## 下一期路线
 
