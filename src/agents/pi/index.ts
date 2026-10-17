@@ -4,6 +4,7 @@ import { isAbsolute } from "node:path";
 import { z } from "zod";
 import type {
   AgentAdapter,
+  AgentDiscovery,
   FieldOptionSource,
   AgentConfig,
   AgentRunContext,
@@ -592,15 +593,20 @@ export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
     return buildResult(state, exitCode);
   };
 
-  const discoverOptions = async (): Promise<FieldOptionSource[]> => {
+  const discoverOptions = async (): Promise<AgentDiscovery> => {
     const sources: FieldOptionSource[] = [];
 
     /* ---- models: authoritative, straight from pi ---- */
+    // `model id -> provider`, taken from pi rather than from the id string.
+    const modelProviders: Record<string, string> = {};
     const discovered = await discoverModels(bin);
     if ("error" in discovered) {
       sources.push({ key: "model", options: [], source: "pi get_available_models", error: discovered.error });
     } else {
       const options = discovered.models.map((model) => {
+        if (typeof model.provider === "string" && model.provider !== "") {
+          modelProviders[model.id] = model.provider;
+        }
         const bits: string[] = [];
         if (model.provider) bits.push(model.provider);
         if (model.contextWindow) bits.push(`${formatTokens(model.contextWindow)} ctx`);
@@ -616,7 +622,9 @@ export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
         key: "model",
         options,
         source: "pi get_available_models",
-        // The provider is implied by the model id, so the UI can set both.
+        // Each option carries the provider pi reports for it. The model id's
+        // prefix is NOT the provider (e.g. `workbuddy/claude-sonnet-5.5` runs on
+        // `any-endpoint`), so the UI must not guess from the string.
       });
       const providers = [...new Set(discovered.models.map((m) => m.provider).filter((p): p is string => typeof p === "string"))];
       if (providers.length > 0) {
@@ -626,6 +634,7 @@ export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
           source: "pi get_available_models",
         });
       }
+
     }
 
     /* ---- thinking: static, mirrors pi's --thinking levels ---- */
@@ -643,7 +652,7 @@ export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
       source: "pi default tools",
     });
 
-    return sources;
+    return { options: sources, modelProviders };
   };
 
   return {

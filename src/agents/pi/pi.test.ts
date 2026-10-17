@@ -335,6 +335,83 @@ test("a provider that is unavailable fails the run with pi's own message", async
   }
 });
 
+test("discoverOptions reports real models, providers and the model->provider map", async () => {
+  // A fake pi that answers `get_available_models` like the real one.
+  const dir = mkdtempSync(join(tmpdir(), "aaas-discover-"));
+  const bin = join(dir, "listing-pi.mjs");
+  // Written with plain concatenation: template literals would turn the \n
+  // escapes into real newlines and break the JSONL the script emits.
+  const script = [
+    "#!/usr/bin/env node",
+    'import { createInterface } from "node:readline";',
+    "const out = (r) => process.stdout.write(JSON.stringify(r) + String.fromCharCode(10));",
+    "const rl = createInterface({ input: process.stdin });",
+    'rl.on("line", (line) => {',
+    "  let cmd; try { cmd = JSON.parse(line); } catch { return; }",
+    '  if (cmd.type === "get_available_models") {',
+    "    out({ id: cmd.id, type: \"response\", command: \"get_available_models\", success: true, data: { models: [",
+    // The id prefix is NOT the provider - this is the case that broke the UI.
+    '      { id: "workbuddy/claude-sonnet-5.5", name: "Sonnet", provider: "any-endpoint", reasoning: true, contextWindow: 1000000, maxTokens: 128000 },',
+    '      { id: "other/model-x", name: "ModelX", provider: "other-provider", contextWindow: 200000 }',
+    "    ] } });",
+    "    return;",
+    "  }",
+    '  out({ id: cmd.id, type: "response", command: cmd.type, success: true, data: {} });',
+    "});",
+    "rl.on(\"close\", () => process.exit(0));",
+    "",
+  ].join(String.fromCharCode(10));
+  writeFileSync(bin, script, "utf8");
+  chmodSync(bin, 0o755);
+  const adapter = createPiAdapter({ bin });
+  try {
+    assert.ok(adapter.discoverOptions, "pi must expose discovery");
+    const discovery = await adapter.discoverOptions();
+    const byKey = new Map(discovery.options.map((o) => [o.key, o]));
+
+    const models = byKey.get("model");
+    assert.ok(models);
+    assert.deepEqual(
+      models.options.map((o) => o.value),
+      ["workbuddy/claude-sonnet-5.5", "other/model-x"],
+    );
+    assert.match(models.options[0]?.detail ?? "", /any-endpoint/);
+    assert.match(models.options[0]?.detail ?? "", /1M ctx/);
+
+    // The authoritative map is what the UI must use; splitting the id is wrong.
+    assert.deepEqual(discovery.modelProviders, {
+      "workbuddy/claude-sonnet-5.5": "any-endpoint",
+      "other/model-x": "other-provider",
+    });
+
+    assert.deepEqual(
+      byKey.get("provider")?.options.map((o) => o.value),
+      ["any-endpoint", "other-provider"],
+    );
+    assert.deepEqual(
+      byKey.get("thinking")?.options.map((o) => o.value),
+      ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+    );
+    assert.equal(byKey.get("tools")?.multiple, true);
+    assert.deepEqual(
+      byKey.get("tools")?.options.map((o) => o.value),
+      ["read", "bash", "edit", "write"],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("discoverOptions degrades to an error instead of throwing", async () => {
+  const adapter = createPiAdapter({ bin: "/nonexistent/pi-binary" });
+  assert.ok(adapter.discoverOptions);
+  const discovery = await adapter.discoverOptions();
+  const modelSource = discovery.options.find((o) => o.key === "model");
+  assert.ok(modelSource, "the model key must still be present");
+  assert.ok(modelSource.error, "so the UI knows to fall back to free text");
+  assert.deepEqual(modelSource.options, []);
+});
+
 test("rpc client rejects pending commands when the child exits", async () => {  const dir = mkdtempSync(join(tmpdir(), "aaas-rpc-"));
   const bin = join(dir, "dying-pi.mjs");
   writeFileSync(bin, "#!/usr/bin/env node\nsetTimeout(() => process.exit(9), 60);\n", "utf8");

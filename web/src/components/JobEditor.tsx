@@ -120,6 +120,7 @@ function defaultConfigFor(plugin: { fields: FieldSchema[] } | undefined): Record
 
 interface AgentOptionArgs {
   options: Record<string, FieldOptionSource>;
+  modelProviders: Record<string, string>;
   value: FieldValue | undefined;
   disabled: boolean;
   onChange: (next: string | string[] | undefined) => void;
@@ -140,7 +141,9 @@ function agentOptionProps(
   return {
     renderCustom: () => (
       <OptionControl
+        id={`agent-${schema.key}`}
         source={source}
+        modelProviders={args.modelProviders}
         value={args.value}
         onChange={args.onChange}
         disabled={args.disabled}
@@ -359,8 +362,13 @@ export function JobEditor({
   const agentFields = agentPlugin?.fields ?? [];
 
   // Real choices from the agent itself (models, thinking levels, default tools).
-  const { options: agentOptions, loading: optionsLoading, error: optionsError, refresh: refreshOptions } =
-    useAgentOptions(form.agentType);
+  const {
+    options: agentOptions,
+    modelProviders,
+    loading: optionsLoading,
+    error: optionsError,
+    refresh: refreshOptions,
+  } = useAgentOptions(form.agentType);
   const agentOptionsState = { loading: optionsLoading, error: optionsError, refresh: refreshOptions };
 
   const patch = useCallback((next: Partial<FormState>) => {
@@ -739,6 +747,7 @@ export function JobEditor({
             disabled={busy}
             {...agentOptionProps(schema, {
               options: agentOptions,
+              modelProviders,
               value: form.agentConfig[schema.key],
               disabled: busy,
               onChange: (next) => setAgentField(schema.key, next as FieldValue),

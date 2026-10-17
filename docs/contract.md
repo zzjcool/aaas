@@ -52,6 +52,25 @@ jobs/*.yaml                      父会话（示例任务）
 
 插件声明了这个提示，UI 才能给出合适的控件；不声明就退化成普通输入框，功能不会坏。
 
+### Agent 选项发现：`GET /api/agents/:type/options`
+
+Agent 适配器可选实现 `discoverOptions(): Promise<AgentDiscovery>`，让 UI 把
+「模型 / 思考层级 / 工具」变成选择器而不是让人手打标识符：
+
+```ts
+interface AgentDiscovery {
+  options: FieldOptionSource[];        // { key, options[], source?, error?, multiple? }
+  modelProviders?: Record<string,string>;  // model id -> 真实 provider
+  discoveredAt?: number;
+}
+```
+
+- 响应缓存 10 分钟，`?refresh=1` 强制刷新。发现过程会拉起 pi，需要几秒。
+- **`modelProviders` 是必需的**：模型 id 的前缀**不是** provider
+  （`workbuddy/claude-sonnet-5.5` 实际跑在 `any-endpoint`）。UI 必须用这张表派生，
+  否则会写出 pi 拒绝的配置。
+- 发现失败不报错：返回带 `error` 的项，UI 自动退化成自由输入。
+
 ### pi 适配器默认值（重要）
 
 - `extensions` 不设 → **不传 `--no-extensions`**（继承 pi 正常环境，扩展注册的 provider 可用）。显式 `extensions: false` 才封闭。

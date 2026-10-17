@@ -11,11 +11,13 @@ import type { AgentOptionsResponse, FieldOptionSource } from "../types.ts";
  */
 export function useAgentOptions(type: string | null | undefined): {
   options: Record<string, FieldOptionSource>;
+  modelProviders: Record<string, string>;
   loading: boolean;
   error: string | null;
   refresh: () => void;
 } {
   const [byKey, setByKey] = useState<Record<string, FieldOptionSource>>({});
+  const [modelProviders, setModelProviders] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -23,6 +25,7 @@ export function useAgentOptions(type: string | null | undefined): {
   useEffect(() => {
     if (!type) {
       setByKey({});
+      setModelProviders({});
       return;
     }
     let cancelled = false;
@@ -34,6 +37,7 @@ export function useAgentOptions(type: string | null | undefined): {
         const next: Record<string, FieldOptionSource> = {};
         for (const source of response.options) next[source.key] = source;
         setByKey(next);
+        setModelProviders(response.modelProviders ?? {});
         setError(null);
       } catch (err) {
         if (!cancelled) setError(errorMessage(err));
@@ -48,6 +52,7 @@ export function useAgentOptions(type: string | null | undefined): {
 
   return {
     options: byKey,
+    modelProviders,
     loading,
     error,
     refresh: () => setNonce((value) => value + 1),
@@ -60,8 +65,12 @@ export interface OptionControlProps {
   value: unknown;
   onChange: (next: string | string[] | undefined) => void;
   disabled?: boolean;
-  /** When true the field maps to two keys (provider + model). */
+  /** Selecting a model also pins the provider pi reports for it. */
   onDerive?: (patch: Record<string, string>) => void;
+  /** Authoritative model -> provider map from discovery. */
+  modelProviders?: Record<string, string>;
+  /** DOM id, so the wrapper <label> can point at this control. */
+  id?: string;
 }
 
 /**
@@ -71,7 +80,15 @@ export interface OptionControlProps {
  * unknown/failed model list never blocks someone from describing what they
  * want. The chosen value is always the plain string pi accepts.
  */
-export function OptionControl({ source, value, onChange, disabled = false, onDerive }: OptionControlProps) {
+export function OptionControl({
+  source,
+  value,
+  onChange,
+  disabled = false,
+  onDerive,
+  modelProviders = {},
+  id,
+}: OptionControlProps) {
   const current = typeof value === "string" ? value : "";
   const multiple = source.multiple === true;
   const selected = useMemo(() => {
@@ -95,6 +112,7 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
     return (
       <div className="opt-control">
         <input
+          id={id}
           className="input input--mono"
           type="text"
           value={current}
@@ -118,7 +136,7 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
     };
     return (
       <div className="opt-control">
-        <div className="chips" role="group" aria-label={source.key}>
+        <div className="chips" id={id} role="group" aria-label={source.key}>
           {source.options.map((option) => (
             <button
               key={option.value}
@@ -146,6 +164,7 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
       <div className="opt-control">
         <div className="opt-control__row">
           <input
+            id={id}
             className="input input--mono"
             type="text"
             value={current}
@@ -153,8 +172,7 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
             disabled={disabled}
             onChange={(event) => {
               const next = event.currentTarget.value;
-              const match = source.options.find((option) => option.value === next);
-              if (match && onDerive) onDerive(derivePatch(source.key, match.value));
+              if (onDerive) onDerive(derivePatch(source.key, next, modelProviders));
               onChange(next === "" ? undefined : next);
             }}
           />
@@ -173,6 +191,7 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
     <div className="opt-control">
       <div className="opt-control__row">
         <select
+          id={id}
           className="input input--select"
           value={known ? current : ""}
           disabled={disabled}
@@ -182,8 +201,7 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
               onChange(undefined);
               return;
             }
-            const match = source.options.find((option) => option.value === next);
-            if (match && onDerive) onDerive(derivePatch(source.key, match.value));
+            if (onDerive) onDerive(derivePatch(source.key, next, modelProviders));
             onChange(next);
           }}
         >
@@ -208,14 +226,19 @@ export function OptionControl({ source, value, onChange, disabled = false, onDer
 }
 
 /**
- * Selecting `provider/model` implies the provider. Deriving it here keeps the
- * two fields consistent without asking the user to set the same fact twice
- * (pi rejects `--provider` without `--model`, and a mismatched pair is a
- * confusing runtime error).
+ * Picking a model also sets its provider, so the user never has to state the
+ * same fact twice (pi rejects `--provider` without `--model`).
+ *
+ * The provider comes from the discovery map, never from the model id: pi
+ * reports `workbuddy/claude-sonnet-5.5` on provider `any-endpoint`, so splitting
+ * the string on `/` would write a provider that does not exist.
  */
-function derivePatch(key: string, value: string): Record<string, string> {
+function derivePatch(
+  key: string,
+  value: string,
+  modelProviders: Record<string, string>,
+): Record<string, string> {
   if (key !== "model") return {};
-  const slash = value.indexOf("/");
-  if (slash <= 0) return {};
-  return { provider: value.slice(0, slash) };
+  const provider = modelProviders[value];
+  return provider ? { provider } : {};
 }

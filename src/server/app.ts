@@ -6,6 +6,7 @@ import type {
   ApiError,
   CronPreviewRequest,
   CronPreviewResponse,
+  AgentDiscovery,
   EngineStatus,
   FieldOptionSource,
   HealthResponse,
@@ -48,7 +49,7 @@ const SSE_HEARTBEAT_MS = 15_000;
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
-  const optionCache = new Map<string, { at: number; options: FieldOptionSource[] }>();
+  const optionCache = new Map<string, { at: number; discovery: AgentDiscovery }>();
 
   app.setErrorHandler((error: Error & { statusCode?: number; validation?: unknown }, request, reply) => {
     request.log.error(error);
@@ -100,25 +101,27 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       const type = request.params.type;
       const adapter = deps.agents.get(type);
       if (!adapter) return reply.status(404).send({ error: `unknown agent type: ${type}` } satisfies ApiError);
-      if (!adapter.discoverOptions) return { type, options: [] as FieldOptionSource[] };
+      if (!adapter.discoverOptions) {
+        return { type, options: [] as FieldOptionSource[] };
+      }
 
       const refresh = request.query.refresh === "1" || request.query.refresh === "true";
       const cached = optionCache.get(type);
       if (!refresh && cached && Date.now() - cached.at < OPTION_CACHE_MS) {
-        return { type, options: cached.options, cachedAt: cached.at };
+        return { type, ...cached.discovery, cachedAt: cached.at };
       }
 
-      let options: FieldOptionSource[];
+      let discovery: AgentDiscovery;
       try {
-        options = await adapter.discoverOptions();
+        discovery = await adapter.discoverOptions();
       } catch (err) {
         // Discovery is best-effort: the UI falls back to free text.
-        options = [
-          { key: "*", options: [], error: err instanceof Error ? err.message : String(err) },
-        ] satisfies FieldOptionSource[];
+        discovery = {
+          options: [{ key: "*", options: [], error: err instanceof Error ? err.message : String(err) }],
+        };
       }
-      optionCache.set(type, { at: Date.now(), options });
-      return { type, options, cachedAt: Date.now(), fresh: true };
+      optionCache.set(type, { at: Date.now(), discovery });
+      return { type, ...discovery, cachedAt: Date.now(), fresh: true };
     },
   );
 

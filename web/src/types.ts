@@ -36,6 +36,11 @@ import type { FieldOptionSource, RunRecord } from "../../src/shared/types.ts";
 export interface AgentOptionsResponse {
   type: string;
   options: FieldOptionSource[];
+  /**
+   * `model id -> real provider`, straight from pi. Deriving it from the id
+   * prefix is wrong (`workbuddy/claude-sonnet-5.5` runs on `any-endpoint`).
+   */
+  modelProviders?: Record<string, string>;
   cachedAt?: number;
   fresh?: boolean;
 }

@@ -324,6 +324,18 @@ export interface FieldOptionSource {
   multiple?: boolean;
 }
 
+/** Full discovery result: field options plus facts that span several fields. */
+export interface AgentDiscovery {
+  options: FieldOptionSource[];
+  /**
+   * Authoritative `model id -> provider` map. The model id prefix is not the
+   * provider (e.g. `workbuddy/claude-sonnet-5.5` runs on `any-endpoint`), so the
+   * UI must read this instead of splitting the string.
+   */
+  modelProviders?: Record<string, string>;
+  discoveredAt?: number;
+}
+
 export interface AgentAdapter {
   readonly type: string;
   readonly descriptor: PluginDescriptor;
@@ -334,7 +346,7 @@ export interface AgentAdapter {
    * Optional: enumerate real choices for config fields (models, tools, …).
    * Called on demand by `GET /api/agents/:type/options`; must never throw.
    */
-  discoverOptions?(): Promise<FieldOptionSource[]>;
+  discoverOptions?(): Promise<AgentDiscovery>;
 }
 
 /* ------------------------------------------------------------------ */

@@ -154,6 +154,68 @@ test("trigger and agent plugins are discoverable with form descriptors", async (
   });
 });
 
+test("agent options endpoint proxies discovery and degrades on failure", async () => {
+  await withApp(async ({ app, agents }) => {
+    // An adapter without discovery must not break the endpoint.
+    const plain = await app.inject({ method: "GET", url: "/api/agents/echo/options" });
+    assert.equal(plain.statusCode, 200);
+    assert.deepEqual(plain.json().options, []);
+
+    // With discovery, the shape (options + modelProviders) is passed through.
+    agents.register({
+      type: "discovering",
+      descriptor: { type: "discovering", displayName: "D", description: "", fields: [] },
+      validate: () => ({ ok: true, config: { type: "pi", cwd: "/tmp" } as never }),
+      run: async () => ({ ok: true, text: "", exitCode: 0 }),
+      discoverOptions: async () => ({
+        options: [
+          {
+            key: "model",
+            options: [{ value: "workbuddy/x", label: "X" }],
+            source: "pi get_available_models",
+          },
+        ],
+        modelProviders: { "workbuddy/x": "any-endpoint" },
+      }),
+    } as never);
+
+    const discovered = await app.inject({ method: "GET", url: "/api/agents/discovering/options" });
+    assert.equal(discovered.statusCode, 200);
+    const body = discovered.json();
+    assert.equal(body.type, "discovering");
+    assert.equal(body.options[0].key, "model");
+    // Without this map the UI would write provider "workbuddy" and break runs.
+    assert.deepEqual(body.modelProviders, { "workbuddy/x": "any-endpoint" });
+
+    // Cached by default, refreshed on demand.
+    assert.equal(body.fresh, true);
+    const cached = await app.inject({ method: "GET", url: "/api/agents/discovering/options" });
+    assert.equal(cached.json().fresh, undefined);
+    const refreshed = await app.inject({ method: "GET", url: "/api/agents/discovering/options?refresh=1" });
+    assert.equal(refreshed.json().fresh, true);
+
+    // Unknown agent type is a 404, not a crash.
+    assert.equal((await app.inject({ method: "GET", url: "/api/agents/ghost/options" })).statusCode, 404);
+  });
+});
+
+test("a throwing discovery degrades to an error entry", async () => {
+  await withApp(async ({ app, agents }) => {
+    agents.register({
+      type: "broken",
+      descriptor: { type: "broken", displayName: "B", description: "", fields: [] },
+      validate: () => ({ ok: true, config: { type: "pi", cwd: "/tmp" } as never }),
+      run: async () => ({ ok: true, text: "", exitCode: 0 }),
+      discoverOptions: async () => {
+        throw new Error("pi exploded");
+      },
+    } as never);
+    const response = await app.inject({ method: "GET", url: "/api/agents/broken/options" });
+    assert.equal(response.statusCode, 200);
+    assert.match(response.json().options[0].error, /pi exploded/);
+  });
+});
+
 test("creating a job writes YAML, validates plugins, and exposes next fire", async () => {
   await withApp(async ({ app, jobsDir, jobs }) => {
     const created = await app.inject({ method: "POST", url: "/api/jobs", payload: specBody() });
