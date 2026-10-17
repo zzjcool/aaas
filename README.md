@@ -69,7 +69,7 @@ trigger:
   timezone: Asia/Shanghai
 agent:
   type: pi
-  cwd: /root/code/some-repo
+  cwd: /path/to/your/repo   # 必须存在：写错会让 job 变成 problem 且永不运行
   tools: [read, grep, find, ls]
   # provider/model 可省略 —— 继承 pi 自己的默认（本机是扩展注册的 any-endpoint）
 prompt: |
@@ -78,12 +78,19 @@ timeoutMs: 1800000
 retries: 1
 ```
 
+> `cwd` 一定要换成你机器上的真实目录。路径不存在时 job 不会被拒绝，但会
+> 带上 `problem: cwd: directory does not exist` 并且**永远不触发**。
+
 立刻验证：
 
 ```bash
 npm run cli -- preview --cron "0 9 * * 1-5" --tz Asia/Shanghai
 npm run cli -- run nightly-repo-report --wait    # 流式跟日志直到结束
 ```
+
+> 上面示例的 id 是 `nightly-repo-report`（与你新建的文件一致即可）。
+> 仓库自带的示例在 `jobs/`：`hello-clock`、`nightly-repo-audit`、`weekly-report`
+> （都默认 `enabled: false`，改 `true` 才会真的调度）。
 
 ## 设计要点
 

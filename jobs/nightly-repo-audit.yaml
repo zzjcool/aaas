@@ -8,7 +8,9 @@ trigger:
   timezone: Asia/Shanghai
 agent:
   type: pi
-  cwd: /root/code/aaas
+  # 不要写宿主绝对路径：这个示例在 QA 容器里也要能跑，那里源码在 /app。
+  # 改成你自己的仓库路径后再把 enabled 打开。
+  cwd: /tmp
   tools: [read, grep, find, ls, bash]
   appendSystemPrompt: |
     You are running unattended inside aaas. Keep the final answer under
