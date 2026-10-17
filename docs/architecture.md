@@ -104,7 +104,10 @@ interface AgentAdapter {
 ## 插件化的边界（故意不做的抽象）
 
 - **没有**通用「事件总线」让插件互相通信。触发器和 agent 之间只通过 `JobSpec` 和运行记录耦合。
-- **没有**插件热加载（`import()` 外部 .ts）。注册是编译期的事（`src/server/main.ts`）；YAML 可以热改并通过 `reloadJobs()` 生效。
+- **没有**插件热加载（`import()` 外部 .ts）。注册是编译期的事（`src/server/main.ts`）。
+- **没有** job 文件的文件监听（无 `fs.watch`）：直接改 `jobs/*.yaml` 不会自动生效。
+  `reloadJobs()` 只在通过 API 增改删 job 时被调用，**手改 YAML 需要重启服务**
+  （或调用一次 API 触发重载）。
 - **没有** DAG / 任务依赖。一期每个 job 独立。需要串联时，让 agent 自己去触发（或二期加 `dependsOn`）。
 
 这几条都是刻意的：先把「一个触发器 + 一个 agent + 一条运行记录」的通路做扎实，扩展点留在此处足够的形状上。
