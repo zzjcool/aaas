@@ -29,9 +29,11 @@ DOCKER     := docker
 RUN_ARGS   := --rm -it
 COMPOSE    := $(DOCKER) compose
 
-.PHONY: help qa-up qa-down qa-restart qa-logs qa-status qa-shell qa-ps
+# 注：qa-ps 曾声明为 .PHONY 但没有对应规则，`make qa-ps` 静默成功，
+# 让人以为容器有问题。已移除；容器状态请用 qa-status。
+.PHONY: help qa-up qa-down qa-restart qa-logs qa-status qa-shell
 .PHONY: image test typecheck unit e2e e2e-real smoke gate coverage
-.PHONY: ci-local build web-build clean
+.PHONY: ci-local ci-local-full web-ci build web-build clean
 
 ## help: 列出所有目标
 help:
@@ -132,9 +134,26 @@ gate:
 ## test: 全部门禁 —— typecheck + 单元 + 覆盖率 + E2E
 test: typecheck gate smoke e2e
 
-## ci-local: 完全复现 GitHub Actions 的门禁（推代码前先跑这个）
-ci-local:
-	npm ci && npm run typecheck && npm test && node scripts/coverage-gate.mjs && npm run e2e
+## ci-local: 复现 GitHub Actions 的门禁（推代码前先跑这个）
+#
+# 以前这行名不副实：缺 web 依赖安装（新 clone 直接红）、缺前端构建、缺
+# npm audit、缺镜像构建，还把单测跑了两遍（npm test + coverage-gate 内部
+# 再跑一次）。本地绿灯 ≠ CI 绿灯，正是流程信任崩掉的方式。
+ci-local: web-ci
+	npm ci
+	npm run typecheck
+	node scripts/coverage-gate.mjs
+	npm audit --audit-level=high
+	npm run build
+	npm run test:e2e
+	npm run smoke
+
+## ci-local-full: ci-local + 重建 QA 镜像（CI 第三个 job 的完整本地版）
+ci-local-full: ci-local image
+
+## web-ci: 安装前端依赖（CI 里每个 job 都做，本地容易忘）
+web-ci:
+	npm --prefix web ci
 
 # ─────────────────────────────────────────────────────────────
 # 杂项

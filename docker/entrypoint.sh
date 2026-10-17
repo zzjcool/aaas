@@ -45,12 +45,26 @@ if [ ! -d web/node_modules/.bin ] || [ ! -f web/node_modules/.aaas-install-stamp
   touch web/node_modules/.aaas-install-stamp
 fi
 
-# 前端永远现编：QA 要看的就是当前源码的 UI。
+# QA 要看的就是当前源码的 UI，所以 dist 必须对源码保持新鲜。
+#
+# 这里曾经是 `if [ ! -f web/dist/index.html ]`：web/dist 被 gitignore 但在宿主
+# 上存在，于是改完前端 `make qa-restart` 后容器里跑的还是上一次的构建。
+# QA 报的 bug 可能早已修好，开发者修完 QA 又复现不出来 —— 典型流程性返工。
+# 判据改成「源码比产物新」，而不是「产物是否存在」。
+needs_build=0
 if [ ! -f web/dist/index.html ]; then
-  log "构建前端"
+  needs_build=1
+  reason="无构建产物"
+elif [ -n "$(find web/src web/index.html -newer web/dist/index.html -print -quit 2>/dev/null)" ]; then
+  needs_build=1
+  reason="源码比产物新"
+fi
+
+if [ "$needs_build" -eq 1 ]; then
+  log "构建前端（${reason}）"
   npm --prefix web run build
 else
-  log "复用 web/dist（make 目标会随源码重建）"
+  log "复用 web/dist（与源码一致）"
 fi
 
 # ── 3. 模型接入点自检 ──────────────────────────────────────────
