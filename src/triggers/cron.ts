@@ -23,7 +23,7 @@ export function createCronTrigger(options: CronTriggerOptions, cache = new Map<s
         label: "Cron expression",
         type: "string",
         placeholder: "0 9 * * 1-5",
-        help: "5 fields (min hour dom mon dow), 6 fields (sec min hour dom mon dow), or a macro such as @daily.",
+        help: "5 fields (min hour dom mon dow), 6 fields (sec min hour dom mon dow), or a macro: @hourly @daily @midnight @weekly @monthly @yearly.",
       },
       {
         key: "every",

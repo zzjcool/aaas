@@ -77,10 +77,30 @@ export function isValidTimezone(tz: string): boolean {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Macros croner does not know but that are conventional cron vocabulary.
+ * Values are 5-field equivalents.
+ */
+const MACRO_ALIASES: Record<string, string> = {
+  "@midnight": "0 0 * * *",
+  "@reboot": "0 0 * * *",
+};
+
+/**
+ * Expand a macro the underlying engine cannot parse. Unknown macros are passed
+ * through unchanged so croner reports them.
+ */
+function expandMacro(expr: string): string {
+  return MACRO_ALIASES[expr.toLowerCase()] ?? expr;
+}
+
+/**
  * Validate a cron expression for a timezone.
  *
  * Accepts 5-field (`m h dom mon dow`), 6-field (`s m h dom mon dow`) and macros
- * (`@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, `@annually`).
+ * (`@hourly`, `@daily`, `@midnight`, `@weekly`, `@monthly`, `@yearly`, `@annually`).
+ *
+ * `@midnight` is a conventional cron macro that croner@9 does not implement, so
+ * it is expanded here before validation. Same for anything else in MACRO_ALIASES.
  */
 export function parseCron(
   expr: string,
@@ -105,15 +125,17 @@ export function parseCron(
     }
   }
 
+  const expanded = expandMacro(cron);
+
   try {
     // Construction validates the pattern (and the timezone) without scheduling.
-    new Cron(cron, { paused: true, timezone }).stop();
+    new Cron(expanded, { paused: true, timezone }).stop();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return fail(`Invalid cron expression "${cron}": ${message}`);
   }
 
-  return { ok: true, value: { cron, timezone } };
+  return { ok: true, value: { cron: expanded, timezone } };
 }
 
 /* ------------------------------------------------------------------ */

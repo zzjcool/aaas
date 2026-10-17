@@ -45,6 +45,26 @@ test("parseCron accepts macros", () => {
   }
 });
 
+test("parseCron expands @midnight, which croner does not implement", () => {
+  const result = parseCron("@midnight", TZ);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.cron, "0 0 * * *", "must expand to the engine-compatible form");
+  // Same fires as @daily.
+  const midnight = nextCronFires("@midnight", TZ, 1_700_000_000_000, 3);
+  const daily = nextCronFires("@daily", TZ, 1_700_000_000_000, 3);
+  assert.deepEqual(midnight, daily);
+});
+
+test("parseCron rejects unknown macros instead of silently accepting them", () => {
+  const result = parseCron("@nonsense", TZ);
+  assert.equal(result.ok, false);
+});
+
+test("describeCron renders @midnight like @daily", () => {
+  assert.equal(describeCron("@midnight", TZ), "Every day at midnight");
+});
+
 test("parseCron collapses surrounding and repeated whitespace", () => {
   const result = parseCron("  0   9  *  *  *  ", TZ);
   assert.equal(result.ok, true);

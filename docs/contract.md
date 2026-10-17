@@ -67,6 +67,7 @@ interface TriggerPlugin<TConfig> {
 - 事件型插件（webhook）实现 `start`，通过 `ctx.emit(event)` 投递。
 - `nextFire` 必须**严格大于** `after`，返回 `null` 表示永不再触发。
 - cron 解析统一用 **`croner@9`**（已装，支持 5/6 段、`@hourly` 等宏、`{timezone}` 选项、`nextRuns(n, after)`）。不要自己手写 cron parser。
+- croner 不认识的 `@midnight` 由 `src/core/cron.ts` 的 `MACRO_ALIASES` 先展开；未知宏直接拒绝，不静默接受。
 
 ## 4. Agent 适配器契约
 
