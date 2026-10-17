@@ -8,3 +8,7 @@ tmp/
 node_modules/
 .DS_Store
 *.log
+dist/
+*.tsbuildinfo
+.pi/
+.pi-subagents/

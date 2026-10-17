@@ -1,0 +1,18 @@
+id: hello-clock
+name: Hello clock
+description: Smoke-test job — proves scheduling and the pi adapter work.
+enabled: false
+trigger:
+  type: cron
+  cron: "*/15 * * * *"
+  timezone: Asia/Shanghai
+agent:
+  type: pi
+  cwd: /tmp
+  tools: [read, ls]
+prompt: |
+  Reply with exactly one line: "aaas tick at <current ISO timestamp>".
+  Do not use any tools and do not read any files.
+timeoutMs: 300000
+retries: 0
+tags: [smoke]

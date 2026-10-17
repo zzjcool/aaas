@@ -1,0 +1,17 @@
+id: weekly-report
+name: Weekly report
+description: Monday morning summary job, demonstrates a timezone-aware cron.
+enabled: false
+trigger:
+  type: cron
+  cron: "0 9 * * 1"
+  timezone: Asia/Shanghai
+agent:
+  type: pi
+  cwd: /tmp
+  tools: [read, ls]
+prompt: |
+  Produce a five-bullet summary of the previous week for the operator.
+timeoutMs: 600000
+retries: 0
+tags: [report]

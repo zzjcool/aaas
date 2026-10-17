@@ -1,0 +1,23 @@
+id: nightly-repo-audit
+name: Nightly repo audit
+description: Reviews the last day of commits and writes a short risk report.
+enabled: false
+trigger:
+  type: cron
+  cron: "0 2 * * *"
+  timezone: Asia/Shanghai
+agent:
+  type: pi
+  cwd: /root/code/aaas
+  tools: [read, grep, find, ls, bash]
+  appendSystemPrompt: |
+    You are running unattended inside aaas. Keep the final answer under
+    20 lines and prefer reading files over running commands.
+prompt: |
+  Look at the commits from the last 24 hours (git log --since="24 hours ago").
+  Summarise: what changed, what looks risky, and what deserves a follow-up.
+  Write the summary to reports/audit.md and reply with the same text.
+timeoutMs: 900000
+retries: 1
+retryBackoffMs: 60000
+tags: [audit, nightly]
