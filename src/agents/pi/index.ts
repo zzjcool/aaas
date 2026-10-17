@@ -181,6 +181,11 @@ function validate(raw: unknown): TriggerValidation<AgentConfig> {
     }
   }
 
+  // pi's own CLI contract: "--provider <name> ... (requires --model)".
+  if (value.provider !== undefined && value.model === undefined) {
+    errors.push("model: required when provider is set (pi cannot select a model without one)");
+  }
+
   if (errors.length > 0) return { ok: false, errors };
 
   const config: PiAgentConfig = { type: "pi", cwd: value.cwd };
@@ -204,31 +209,21 @@ function validate(raw: unknown): TriggerValidation<AgentConfig> {
 /* argv / env                                                          */
 /* ------------------------------------------------------------------ */
 
-export interface BuildArgvOptions {
-  /** Config to translate; only the fields the adapter understands are read. */
-  config: PiAgentConfig;
-}
-
 /** Build the `pi` argv for one run. Always `--mode rpc --no-session`. */
 export function buildPiArgs(config: PiAgentConfig): string[] {
   const args: string[] = ["--mode", "rpc", "--no-session"];
   if (config.provider) args.push("--provider", config.provider);
-  if (config.model) {
-    args.push("--model", config.model);
-    if (config.thinking) args.push("--thinking", config.thinking);
-  } else if (config.thinking) {
-    args.push("--thinking", config.thinking);
-  }
+  if (config.model) args.push("--model", config.model);
+  if (config.thinking) args.push("--thinking", config.thinking);
   if (config.tools && config.tools.length > 0) args.push("--tools", config.tools.join(","));
   if (config.excludeTools && config.excludeTools.length > 0) {
     args.push("--exclude-tools", config.excludeTools.join(","));
   }
   if (config.noTools) args.push("--no-tools");
   if (config.appendSystemPrompt) args.push("--append-system-prompt", config.appendSystemPrompt);
-  if (!config.extensions) args.push("--no-extensions");
+  // Deterministic unattended defaults: extensions/skills/MCP are opt-in.
+  if (!config.extensions) args.push("--no-extensions", "--no-skills");
   if (!config.mcp) args.push("--no-mcp");
-  // Extension discovery is off by default; skills are noise in an unattended run.
-  if (!config.extensions) args.push("--no-skills");
   return args;
 }
 
