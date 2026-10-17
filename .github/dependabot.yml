@@ -1,0 +1,77 @@
+---
+# 依赖更新与安全告警。
+#
+# public 仓库上这是免费的，但没有配置就等于是关着的：GitHub 只在存在
+# dependabot.yml 时才会按此扫描并开 PR。
+
+version: 2
+
+updates:
+  # 后端依赖
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Shanghai
+      cooldown:
+        default-days: 7
+    open-pull-requests-limit: 5
+    # 提交信息保持 conventional 风格，便于后续自动生成 changelog
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # 把 devDependencies 合并成一个 PR，避免每周被 5 个 patch PR 淹没
+      dev-dependencies:
+        dependency-type: development
+    ignore:
+      # 大版本升级需要人确认，不要自动开 PR
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # 前端依赖（独立 package.json / lockfile，必须单独声明）
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Shanghai
+      cooldown:
+        default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions 引用（ci.yml 里的 uses: 版本）
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Shanghai
+      cooldown:
+        default-days: 7
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+
+  # 容器基础镜像 + Dockerfile 里的 ARG 版本（pi / pi-any-endpoint）
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Shanghai
+      cooldown:
+        default-days: 7
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(docker)"

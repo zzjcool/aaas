@@ -192,6 +192,43 @@ describe("L1 · job lifecycle over HTTP", () => {
     assert.ok(byJob.body.every((r: any) => r.jobId === id));
   });
 
+  test("GET /api/jobs/:id returns the full view, not just 404s", async () => {
+    // The 404 path was covered; the 200 shape is what the UI actually renders
+    // (nextFireAt / scheduleText / lastRun / runningCount / problem), and it had
+    // no assertion anywhere.
+    const res = await get(engine, `/api/jobs/${id}`);
+    assert.equal(res.status, 200, res.text);
+    const view = res.body;
+    assert.equal(view.spec.id, id);
+    assert.equal(typeof view.scheduleText, "string");
+    assert.ok(view.scheduleText.length > 0, "scheduleText is rendered in the job list");
+    assert.ok("nextFireAt" in view);
+    assert.equal(typeof view.runningCount, "number");
+    assert.ok("lastRun" in view && "problem" in view);
+    assert.equal(typeof view.sourcePath, "string");
+  });
+
+  test("GET /api/jobs/:id/runs lists one job's history with limit clamping", async () => {
+    // Contract §5 has this endpoint; nothing in the repo exercised it, and the
+    // clampInt bounds (1..500) were unverified.
+    const res = await get(engine, `/api/jobs/${id}/runs`);
+    assert.equal(res.status, 200, res.text);
+    assert.ok(Array.isArray(res.body));
+    assert.ok(res.body.length >= 1);
+    assert.ok(res.body.every((r: any) => r.jobId === id));
+
+    const limited = await get(engine, `/api/jobs/${id}/runs?limit=1`);
+    assert.equal(limited.status, 200, limited.text);
+    assert.equal(limited.body.length, 1, "limit=1 must clamp the result");
+
+    // Out-of-range limits must be clamped, never passed through to SQL.
+    for (const bad of ["0", "9999", "abc", "-1"]) {
+      const r = await get(engine, `/api/jobs/${id}/runs?limit=${bad}`);
+      assert.equal(r.status, 200, `limit=${bad} must not error: ${r.text}`);
+      assert.ok(Array.isArray(r.body), `limit=${bad} must return an array`);
+    }
+  });
+
   test("DELETE removes the YAML and the job disappears", async () => {
     const res = await del(engine, `/api/jobs/${id}`);
     assert.equal(res.status, 204, res.text);

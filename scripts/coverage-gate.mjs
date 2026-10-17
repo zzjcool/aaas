@@ -130,14 +130,29 @@ const pct = (hit, found) => (found > 0 ? (hit / found) * 100 : 100);
 const r2 = (n) => Math.round(n * 100) / 100;
 const rel = (p) => p.replace(`${root}/`, "");
 
+/**
+ * Read the baseline. Missing or unreadable is a FAILURE, not a warning.
+ *
+ * A missing baseline makes the "no regression" rule silently inert, and that
+ * has already happened once: .gitignore excluded coverage/ and the negation
+ * rule failed to re-include the baseline, so CI printed "(no baseline)" and
+ * passed while the ratchet did nothing. Warn-and-continue is exactly how a
+ * gate rots without anyone noticing.
+ */
 function readBaseline() {
-  if (!existsSync(baselinePath)) return null;
+  if (!existsSync(baselinePath)) {
+    throw new Error(
+      `no coverage baseline at ${rel(baselinePath)}. It must be committed — ` +
+        "check .gitignore (a parent-dir ignore blocks later negations). " +
+        "Record one with: node scripts/coverage-gate.mjs --update-baseline",
+    );
+  }
   try {
     const parsed = JSON.parse(readFileSync(baselinePath, "utf8"));
-    return typeof parsed === "object" && parsed !== null ? parsed : null;
+    if (typeof parsed !== "object" || parsed === null) throw new Error("not a JSON object");
+    return parsed;
   } catch (err) {
-    console.warn(`⚠ ignoring unreadable baseline ${rel(baselinePath)}: ${err.message}`);
-    return null;
+    throw new Error(`unreadable coverage baseline at ${rel(baselinePath)}: ${err.message}`);
   }
 }
 
@@ -191,20 +206,19 @@ function main() {
     }
   }
 
+  console.log("\n── vs baseline ──────────────────────────────────────");
   const baseline = readBaseline();
-  if (baseline) {
-    console.log("\n── vs baseline ──────────────────────────────────────");
-    for (const key of ["lines", "branches", "functions"]) {
-      if (typeof baseline[key] !== "number") continue;
-      const delta = r2(measured[key] - baseline[key]);
-      const sign = delta >= 0 ? "+" : "";
-      console.log(`${key.padEnd(10)} ${measured[key]}%  baseline ${baseline[key]}%  ${sign}${delta}`);
-      if (delta < -TOLERANCE) {
-        failures.push(`${key} fell ${Math.abs(delta)} points below the baseline ${baseline[key]}% (tolerance ${TOLERANCE})`);
-      }
+  for (const key of ["lines", "branches", "functions"]) {
+    if (typeof baseline[key] !== "number") {
+      failures.push(`baseline has no "${key}" entry — re-record it with --update-baseline`);
+      continue;
     }
-  } else {
-    console.log(`\n(no baseline at ${rel(baselinePath)} — run with --update-baseline to record one)`);
+    const delta = r2(measured[key] - baseline[key]);
+    const sign = delta >= 0 ? "+" : "";
+    console.log(`${key.padEnd(10)} ${measured[key]}%  baseline ${baseline[key]}%  ${sign}${delta}`);
+    if (delta < -TOLERANCE) {
+      failures.push(`${key} fell ${Math.abs(delta)} points below the baseline ${baseline[key]}% (tolerance ${TOLERANCE})`);
+    }
   }
 
   if (failures.length > 0) {
