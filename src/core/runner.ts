@@ -222,7 +222,40 @@ export class Runner {
           "system",
           `attempt ${attempt - 1} ${outcome.status} (${outcome.error ?? "no detail"}); retrying in ${Math.round(delay)}ms`,
         );
-        await sleep(delay);
+        // Keep an abort controller registered *during* the backoff sleep.
+        //
+        // `#attempt` deletes its controller in its own finally, and cancelJob()
+        // only scans #aborts and #queue — so without this, a retry wait (30s by
+        // default) was an uncancellable window: POST /jobs/:id/cancel answered
+        // {cancelled:0} and the retry fired anyway, flipping the run back from
+        // failed to running. Backoff is not a neutral delay, it is part of the
+        // run, and an operator must be able to stop it.
+        const backoff = new AbortController();
+        this.#aborts.set(run.id, backoff);
+        this.#logLine(run.id, "system", `waiting ${Math.round(delay)}ms before retry (cancellable)`);
+        try {
+          await sleep(delay, backoff.signal);
+        } finally {
+          // Only remove our own entry: a concurrent cancel may have replaced it.
+          if (this.#aborts.get(run.id) === backoff) this.#aborts.delete(run.id);
+        }
+
+        if (backoff.signal.aborted) {
+          const now = this.#now();
+          this.#db.updateRun(run.id, {
+            status: "cancelled",
+            finishedAt: now,
+            error: "cancelled while waiting to retry",
+          });
+          this.#logLine(run.id, "system", "cancelled while waiting to retry", now);
+          const record = this.#db.getRun(run.id);
+          if (record) {
+            this.#emit({ type: "end", runId: record.id, status: "cancelled" });
+            this.#emit({ type: "run", run: toSummary(record) });
+          }
+          return;
+        }
+
         run = { ...run, attempt };
         this.#db.updateRun(run.id, { attempt, status: "running" });
       }
@@ -378,8 +411,27 @@ function truncate(text: string, limit: number): string {
   return text.length <= limit ? text : `${text.slice(0, limit)}\n… (truncated, ${text.length - limit} chars omitted)`;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+/**
+ * Sleep, optionally abortable.
+ *
+ * A plain `setTimeout` cannot be interrupted, and an uninterruptible retry
+ * backoff turns "cancel" into a lie for the whole wait (30s by default).
+ * With a signal, aborting resolves early and clears the timer.
+ */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(done, Math.max(0, ms));
+    signal?.addEventListener("abort", done, { once: true });
+    function done(): void {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+  });
 }
 
 function isCancelled(signal: AbortSignal): boolean {
