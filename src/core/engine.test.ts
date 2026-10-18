@@ -35,10 +35,10 @@ function countingAdapter(): AgentAdapter & { runs: { jobId: string; scheduledFor
 }
 
 test("a cron YAML job fires on the wall-clock time in its own timezone", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "aaas-engine-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-engine-"));
   const dataDir = join(dir, "data");
   const jobsDir = join(dir, "jobs");
-  const db = new Db(join(dataDir, "aaas.db"));
+  const db = new Db(join(dataDir, "trigger.db"));
   const logs = new LogStore(dataDir);
   const bus = new EventBus();
   const triggers = new TriggerRegistry();
@@ -141,10 +141,10 @@ test("a cron YAML job fires on the wall-clock time in its own timezone", async (
 });
 
 test("deleting the YAML file stops the job from firing", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "aaas-engine2-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-engine2-"));
   const dataDir = join(dir, "data");
   const jobsDir = join(dir, "jobs");
-  const db = new Db(join(dataDir, "aaas.db"));
+  const db = new Db(join(dataDir, "trigger.db"));
   const logs = new LogStore(dataDir);
   const bus = new EventBus();
   const triggers = new TriggerRegistry();
@@ -213,7 +213,7 @@ test("deleting the YAML file stops the job from firing", async () => {
 });
 
 test("job YAML documents the resolved spec used by the runner", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "aaas-engine3-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-engine3-"));
   const jobsDir = join(dir, "jobs");
   const store = new JobStore({
     dir: jobsDir,

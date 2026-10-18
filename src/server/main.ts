@@ -35,17 +35,17 @@ export async function boot(options: BootOptions = {}) {
   };
   const log = options.log ?? defaultLog;
 
-  const dataDir = resolve(options.dataDir ?? process.env.AAAS_DATA_DIR ?? "data");
-  const jobsDir = resolve(options.jobsDir ?? process.env.AAAS_JOBS_DIR ?? "jobs");
-  const defaultTimezone = options.defaultTimezone ?? process.env.AAAS_DEFAULT_TZ ?? "Asia/Shanghai";
-  const maxConcurrency = options.maxConcurrency ?? Number(process.env.AAAS_MAX_CONCURRENCY ?? 2);
-  const tickMs = options.tickMs ?? Number(process.env.AAAS_TICK_MS ?? 1000);
-  const missedGraceMs = options.missedGraceMs ?? Number(process.env.AAAS_MISSED_GRACE_MS ?? 60_000);
-  const candidates = [options.webDir ?? process.env.AAAS_WEB_DIR ?? join(process.cwd(), "web", "dist"), join(process.cwd(), "web", "dist")];
+  const dataDir = resolve(options.dataDir ?? process.env.TRIGGER_DATA_DIR ?? "data");
+  const jobsDir = resolve(options.jobsDir ?? process.env.TRIGGER_JOBS_DIR ?? "jobs");
+  const defaultTimezone = options.defaultTimezone ?? process.env.TRIGGER_DEFAULT_TZ ?? "Asia/Shanghai";
+  const maxConcurrency = options.maxConcurrency ?? Number(process.env.TRIGGER_MAX_CONCURRENCY ?? 2);
+  const tickMs = options.tickMs ?? Number(process.env.TRIGGER_TICK_MS ?? 1000);
+  const missedGraceMs = options.missedGraceMs ?? Number(process.env.TRIGGER_MISSED_GRACE_MS ?? 60_000);
+  const candidates = [options.webDir ?? process.env.TRIGGER_WEB_DIR ?? join(process.cwd(), "web", "dist"), join(process.cwd(), "web", "dist")];
   const webDir = candidates.find((candidate) => candidate && existsSync(join(candidate, "index.html"))) ?? null;
 
   const startedAt = Date.now();
-  const db = new Db(join(dataDir, "aaas.db"));
+  const db = new Db(join(dataDir, "trigger.db"));
   const logs = new LogStore(dataDir);
   const bus = new EventBus();
 
@@ -122,10 +122,10 @@ export async function boot(options: BootOptions = {}) {
 
   scheduler.start();
 
-  const port = options.port ?? Number(process.env.AAAS_PORT ?? 7788);
-  const host = options.host ?? process.env.AAAS_HOST ?? "127.0.0.1";
+  const port = options.port ?? Number(process.env.TRIGGER_PORT ?? 7788);
+  const host = options.host ?? process.env.TRIGGER_HOST ?? "127.0.0.1";
   await app.listen({ port, host });
-  log("info", `aaas listening on http://${host}:${port}${webDir ? ` (ui: ${webDir})` : " (ui not built)"}`);
+  log("info", `trigger listening on http://${host}:${port}${webDir ? ` (ui: ${webDir})` : " (ui not built)"}`);
 
   let closing = false;
   const shutdown = async (signal: string) => {

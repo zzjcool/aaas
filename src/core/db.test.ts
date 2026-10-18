@@ -8,7 +8,7 @@ import { Db, toSummary } from "./db.ts";
 import { EventBus, LogStore } from "./events.ts";
 
 function tempDir(): string {
-  return mkdtempSync(join(tmpdir(), "aaas-db-"));
+  return mkdtempSync(join(tmpdir(), "trigger-db-"));
 }
 
 function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {

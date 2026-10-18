@@ -11,7 +11,7 @@ agent:
   cwd: /tmp
   tools: [read, ls]
 prompt: |
-  Reply with exactly one line: "aaas tick at <current ISO timestamp>".
+  Reply with exactly one line: "trigger tick at <current ISO timestamp>".
   Do not use any tools and do not read any files.
 timeoutMs: 300000
 retries: 0

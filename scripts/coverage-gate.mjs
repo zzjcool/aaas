@@ -31,13 +31,13 @@ const baselinePath = join(outDir, "coverage-baseline.json");
 
 /** Absolute floors: below these the build is red regardless of the baseline. */
 const FLOORS = {
-  lines: num(process.env.AAAS_COVER_FLOOR_LINES, 90),
-  branches: num(process.env.AAAS_COVER_FLOOR_BRANCHES, 70),
-  functions: num(process.env.AAAS_COVER_FLOOR_FUNCTIONS, 80),
+  lines: num(process.env.TRIGGER_COVER_FLOOR_LINES, 90),
+  branches: num(process.env.TRIGGER_COVER_FLOOR_BRANCHES, 70),
+  functions: num(process.env.TRIGGER_COVER_FLOOR_FUNCTIONS, 80),
 };
 
 /** Allowed drop vs. baseline, in percentage points, before the gate fails. */
-const TOLERANCE = num(process.env.AAAS_COVER_TOLERANCE, 0.5);
+const TOLERANCE = num(process.env.TRIGGER_COVER_TOLERANCE, 0.5);
 
 const update = process.argv.includes("--update-baseline");
 

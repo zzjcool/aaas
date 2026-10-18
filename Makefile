@@ -1,4 +1,4 @@
-# aaas — QA 环境一键入口
+# trigger — QA 环境一键入口
 #
 # 设计目标：QA 每次跑 `make qa-up` 拿到的永远是**当前工作区的最新源码**。
 # 因此镜像里不放源码副本 —— 源码以只读 bind mount 挂进去，依赖在容器启动时
@@ -9,8 +9,8 @@
 
 SHELL := /bin/bash
 
-IMAGE      ?= aaas-qa
-CONTAINER  ?= aaas-qa
+IMAGE      ?= trigger-qa
+CONTAINER  ?= trigger-qa
 PORT       ?= 7788
 # 宿主机上的项目根目录（源码挂载点）
 SRC        ?= $(CURDIR)
@@ -52,22 +52,22 @@ qa-up: image
 	@$(DOCKER) rm -f $(CONTAINER) >/dev/null 2>&1 || true
 	$(DOCKER) run -d --name $(CONTAINER) \
 		--network=host \
-		-e AAAS_PORT=$(PORT) \
-		-e AAAS_HOST=0.0.0.0 \
-		-e AAAS_DATA_DIR=/data \
-		-e AAAS_JOBS_DIR=/jobs \
-		-e AAAS_WEB_DIR=/app/web/dist \
-		-e AAAS_DEFAULT_TZ=Asia/Shanghai \
-		-e AAAS_E2E_MODEL=$(MODEL) \
-		-e AAAS_E2E_PROVIDER=$(PROVIDER) \
+		-e TRIGGER_PORT=$(PORT) \
+		-e TRIGGER_HOST=0.0.0.0 \
+		-e TRIGGER_DATA_DIR=/data \
+		-e TRIGGER_JOBS_DIR=/jobs \
+		-e TRIGGER_WEB_DIR=/app/web/dist \
+		-e TRIGGER_DEFAULT_TZ=Asia/Shanghai \
+		-e TRIGGER_E2E_MODEL=$(MODEL) \
+		-e TRIGGER_E2E_PROVIDER=$(PROVIDER) \
 		-v "$(SRC):/app:ro" \
 		-v "$(PI_AUTH):/root/.pi/agent/auth.json:ro" \
 		-v "$(PI_MODELS):/root/.pi/agent/models-store.json" \
 		-v "$(PI_NPM):/root/.pi/agent/npm/node_modules:ro" \
-		-v aaas-qa-data:/data \
-		-v aaas-qa-jobs:/jobs \
-		-v aaas-qa-nm:/app/node_modules \
-		-v aaas-qa-webnm:/app/web/node_modules \
+		-v trigger-qa-data:/data \
+		-v trigger-qa-jobs:/jobs \
+		-v trigger-qa-nm:/app/node_modules \
+		-v trigger-qa-webnm:/app/web/node_modules \
 		$(IMAGE):latest
 	@bash docker/wait-ready.sh "$(PORT)" "$(CONTAINER)"
 	@echo "  默认模型: $(MODEL) [$(PROVIDER)]"
@@ -82,7 +82,7 @@ qa-restart: qa-down qa-up
 
 ## qa-reset: 清空数据卷，回到全新环境（清掉所有 job 与运行记录）
 qa-reset: qa-down
-	-$(DOCKER) volume rm aaas-qa-data aaas-qa-jobs >/dev/null 2>&1
+	-$(DOCKER) volume rm trigger-qa-data trigger-qa-jobs >/dev/null 2>&1
 	@echo "✔ 数据卷已清空"
 
 ## qa-logs: 跟随 QA 容器日志
@@ -117,7 +117,7 @@ e2e:
 
 ## e2e-real: L3 端到端（真实 pi + 真实模型，需要宿主接入点）
 e2e-real:
-	AAAS_E2E_PI=real npm run e2e
+	TRIGGER_E2E_PI=real npm run e2e
 
 ## smoke: 引擎冒烟（stub adapter，不走 pi）
 smoke:

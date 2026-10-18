@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 /**
- * aaas CLI — thin wrapper over the REST API so operators can script the
+ * trigger CLI — thin wrapper over the REST API so operators can script the
  * platform without the web UI.
  *
- *   aaas health
- *   aaas jobs [--json]
- *   aaas show <jobId>
- *   aaas run <jobId> [--wait]
- *   aaas runs [--job <id>] [--limit 20]
- *   aaas log <runId> [--follow]
- *   aaas cancel <jobId>
- *   aaas enable/disable <jobId>
- *   aaas delete <jobId>
- *   aaas preview --cron "0 9 * * 1-5" --tz Asia/Shanghai
+ *   trigger health
+ *   trigger jobs [--json]
+ *   trigger show <jobId>
+ *   trigger run <jobId> [--wait]
+ *   trigger runs [--job <id>] [--limit 20]
+ *   trigger log <runId> [--follow]
+ *   trigger cancel <jobId>
+ *   trigger enable/disable <jobId>
+ *   trigger delete <jobId>
+ *   trigger preview --cron "0 9 * * 1-5" --tz Asia/Shanghai
  *
- * Base URL: AAAS_URL (default http://127.0.0.1:7788)
+ * Base URL: TRIGGER_URL (default http://127.0.0.1:7788)
  */
 
-const BASE = (process.env.AAAS_URL ?? "http://127.0.0.1:7788").replace(/\/$/, "");
+const BASE = (process.env.TRIGGER_URL ?? "http://127.0.0.1:7788").replace(/\/$/, "");
 
 type Json = Record<string, unknown>;
 
@@ -82,7 +82,7 @@ async function main(argv: string[]): Promise<number> {
     case "health": {
       const health = await api<Json>("/api/health");
       const status = await api<Json>("/api/status");
-      console.log(`${c.bold("aaas")} ${health.version} ${c.green("ok")}`);
+      console.log(`${c.bold("trigger")} ${health.version} ${c.green("ok")}`);
       console.log(`  endpoint       ${BASE}`);
       console.log(`  server time    ${fmtTime(health.now as number)}`);
       console.log(`  default tz     ${health.defaultTimezone}`);
@@ -305,7 +305,7 @@ function parseFlags(args: string[]): Record<string, string | boolean> {
 }
 
 function usage(extra?: string): number {
-  console.log(`aaas CLI — base ${BASE}`);
+  console.log(`trigger CLI — base ${BASE}`);
   console.log("");
   console.log("  health                      service + scheduler status");
   console.log("  jobs [--json]               list jobs");

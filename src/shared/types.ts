@@ -1,5 +1,5 @@
 /**
- * aaas shared domain types — FROZEN CONTRACT (v1)
+ * trigger shared domain types — FROZEN CONTRACT (v1)
  *
  * Consumed by: core engine, trigger plugins, agent adapters, HTTP API, web UI.
  * Rules:
@@ -27,7 +27,7 @@ export interface CronTriggerConfig {
   cron?: string;
   /** Interval shorthand: `30s`, `15m`, `2h`, `1d`. Mutually exclusive with `cron`. */
   every?: string;
-  /** IANA timezone used to interpret `cron`. Defaults to server `AAAS_DEFAULT_TZ` (Asia/Shanghai). */
+  /** IANA timezone used to interpret `cron`. Defaults to server `TRIGGER_DEFAULT_TZ` (Asia/Shanghai). */
   timezone?: string;
 }
 

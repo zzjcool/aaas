@@ -374,7 +374,7 @@ function autoAnswerUiRequest(client: PiRpcProcess, record: RpcRecord, log: (line
 /* ------------------------------------------------------------------ */
 
 export interface PiAdapterOptions {
-  /** Executable to spawn. Defaults to `AAAS_PI_BIN` or `pi`. */
+  /** Executable to spawn. Defaults to `TRIGGER_PI_BIN` or `pi`. */
   bin?: string;
   /** Default per-command RPC timeout (prompt uses the run timeout instead). */
   defaultTimeoutMs?: number;
@@ -409,7 +409,7 @@ interface SettledRecord {
 }
 
 export function createPiAdapter(opts: PiAdapterOptions = {}): AgentAdapter {
-  const bin = opts.bin ?? process.env.AAAS_PI_BIN ?? "pi";
+  const bin = opts.bin ?? process.env.TRIGGER_PI_BIN ?? "pi";
   const defaultTimeoutMs = opts.defaultTimeoutMs ?? 30_000;
 
   const run = async (input: AgentRunInput, ctx: AgentRunContext): Promise<AgentRunResult> => {

@@ -262,7 +262,7 @@ describe("L1 · schedule preview", () => {
 
 describe("L1 · yaml is the source of truth", () => {
   test("a job file dropped on disk is picked up on the next boot", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "aaas-l1-yaml-"));
+    const dir = mkdtempSync(join(tmpdir(), "trigger-l1-yaml-"));
     const jobsDir = join(dir, "jobs");
     mkdirSync(jobsDir, { recursive: true });
     writeFileSync(
@@ -285,7 +285,7 @@ describe("L1 · yaml is the source of truth", () => {
       "utf8",
     );
 
-    const second = await bootEngine({ pi: "fake", webDir: null, env: { AAAS_JOBS_DIR: jobsDir } });
+    const second = await bootEngine({ pi: "fake", webDir: null, env: { TRIGGER_JOBS_DIR: jobsDir } });
     try {
       const listed = await get(second, "/api/jobs");
       const view = listed.body.find((j: any) => j.spec.id === "from-disk");

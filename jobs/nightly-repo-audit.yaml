@@ -13,7 +13,7 @@ agent:
   cwd: /tmp
   tools: [read, grep, find, ls, bash]
   appendSystemPrompt: |
-    You are running unattended inside aaas. Keep the final answer under
+    You are running unattended inside trigger. Keep the final answer under
     20 lines and prefer reading files over running commands.
 prompt: |
   Look at the commits from the last 24 hours (git log --since="24 hours ago").

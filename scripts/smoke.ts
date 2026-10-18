@@ -20,12 +20,12 @@ import { createCronTrigger } from "../src/triggers/cron.ts";
 import { manualTrigger } from "../src/triggers/manual.ts";
 import type { AgentAdapter, AgentConfig } from "../src/shared/types.ts";
 
-const TZ = process.env.AAAS_DEFAULT_TZ ?? "Asia/Shanghai";
-const dir = mkdtempSync(join(tmpdir(), "aaas-smoke-"));
+const TZ = process.env.TRIGGER_DEFAULT_TZ ?? "Asia/Shanghai";
+const dir = mkdtempSync(join(tmpdir(), "trigger-smoke-"));
 const dataDir = join(dir, "data");
 const jobsDir = join(dir, "jobs");
 
-const db = new Db(join(dataDir, "aaas.db"));
+const db = new Db(join(dataDir, "trigger.db"));
 const logs = new LogStore(dataDir);
 const bus = new EventBus();
 const triggers = new TriggerRegistry();

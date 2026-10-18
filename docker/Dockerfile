@@ -1,4 +1,4 @@
-# aaas QA 容器
+# trigger QA 容器
 #
 # 设计约束（决定了这个文件的形状）：
 #
@@ -44,16 +44,16 @@ RUN mkdir -p /app /data /jobs
 
 WORKDIR /app
 
-COPY entrypoint.sh /usr/local/bin/aaas-entrypoint.sh
-RUN chmod +x /usr/local/bin/aaas-entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/trigger-entrypoint.sh
+RUN chmod +x /usr/local/bin/trigger-entrypoint.sh
 
 EXPOSE 7788
 
 # 默认模型（HY4）。可被 docker run -e 覆盖。
-ENV AAAS_E2E_MODEL=workbuddy/hy4-preview-ioa
-ENV AAAS_E2E_PROVIDER=any-endpoint
+ENV TRIGGER_E2E_MODEL=workbuddy/hy4-preview-ioa
+ENV TRIGGER_E2E_PROVIDER=any-endpoint
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
-  CMD curl -sf http://127.0.0.1:${AAAS_PORT:-7788}/api/health || exit 1
+  CMD curl -sf http://127.0.0.1:${TRIGGER_PORT:-7788}/api/health || exit 1
 
-ENTRYPOINT ["/usr/local/bin/aaas-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/trigger-entrypoint.sh"]

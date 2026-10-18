@@ -114,7 +114,7 @@ function pidAlive(pid: number): boolean {
 }
 
 function makeAdapter(mode: string, overrides: Record<string, unknown> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "aaas-pi-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-pi-"));
   const bin = join(dir, "fake-pi.mjs");
   writeFileSync(bin, FAKE_PI, "utf8");
   chmodSync(bin, 0o755);
@@ -337,7 +337,7 @@ test("a provider that is unavailable fails the run with pi's own message", async
 
 test("discoverOptions reports real models, providers and the model->provider map", async () => {
   // A fake pi that answers `get_available_models` like the real one.
-  const dir = mkdtempSync(join(tmpdir(), "aaas-discover-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-discover-"));
   const bin = join(dir, "listing-pi.mjs");
   // Written with plain concatenation: template literals would turn the \n
   // escapes into real newlines and break the JSONL the script emits.
@@ -412,7 +412,7 @@ test("discoverOptions degrades to an error instead of throwing", async () => {
   assert.deepEqual(modelSource.options, []);
 });
 
-test("rpc client rejects pending commands when the child exits", async () => {  const dir = mkdtempSync(join(tmpdir(), "aaas-rpc-"));
+test("rpc client rejects pending commands when the child exits", async () => {  const dir = mkdtempSync(join(tmpdir(), "trigger-rpc-"));
   const bin = join(dir, "dying-pi.mjs");
   writeFileSync(bin, "#!/usr/bin/env node\nsetTimeout(() => process.exit(9), 60);\n", "utf8");
   chmodSync(bin, 0o755);
