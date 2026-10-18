@@ -1,4 +1,4 @@
-# aaas — Agent as a Service
+# trigger — 触发器驱动的 Agent 调度服务
 
 触发器（插件化）→ 任务定义（YAML）→ Agent 适配器（插件化）→ 运行记录 + Web 控制台。
 
@@ -22,7 +22,7 @@
 |---|---|---|
 |Node.js|**≥ 22.19**|用内置 `node:sqlite`，低版本跑不起来|
 |前端依赖|`npm --prefix web install`|`web/` 是独立包，根目录 `npm install` **不会**装它|
-|`pi`|已安装并认证|真实 run 通过 `pi --mode rpc` 子进程执行（`AAAS_PI_BIN` 可换路径）|
+|`pi`|已安装并认证|真实 run 通过 `pi --mode rpc` 子进程执行（`TRIGGER_PI_BIN` 可换路径）|
 |Docker|可选|只有 `make qa-up`（QA 容器）需要|
 
 > 示例里的 `cwd` 请改成你自己机器上的真实目录 —— 写不存在的路径会让 job
@@ -94,7 +94,7 @@ npm run cli -- run nightly-repo-report --wait    # 流式跟日志直到结束
 
 ## 设计要点
 
-**后端只存时间戳。** 所有 `scheduledFor` / `nextFireAt` / `createdAt` 都是 epoch 毫秒。时区只在一处生效：把 cron 表达式翻译成时间戳的那一刻（job 级 `trigger.timezone`，默认 `AAAS_DEFAULT_TZ`）。UI 负责按浏览器本地时区渲染。
+**后端只存时间戳。** 所有 `scheduledFor` / `nextFireAt` / `createdAt` 都是 epoch 毫秒。时区只在一处生效：把 cron 表达式翻译成时间戳的那一刻（job 级 `trigger.timezone`，默认 `TRIGGER_DEFAULT_TZ`）。UI 负责按浏览器本地时区渲染。
 
 **插件化边界。**
 - `TriggerPlugin`：`validate` / `describe` / `nextFire`（时间型）或 `start`（事件型）。加 GitHub webhook 只需实现 `start` 并通过 `ctx.emit()` 投递，引擎、Runner、UI 都不用改。
@@ -133,15 +133,15 @@ docs/contract.md         冻结契约（并行施工依据）
 
 |变量|默认|说明|
 |---|---|---|
-|`AAAS_PORT`|7788|HTTP 端口|
-|`AAAS_HOST`|127.0.0.1|绑定地址|
-|`AAAS_DATA_DIR`|./data|SQLite 与运行日志|
-|`AAAS_JOBS_DIR`|./jobs|YAML 任务目录|
-|`AAAS_DEFAULT_TZ`|Asia/Shanghai|cron 默认时区|
-|`AAAS_MAX_CONCURRENCY`|2|全局并发上限|
-|`AAAS_TICK_MS`|1000|调度 tick|
-|`AAAS_PI_BIN`|pi|pi 可执行文件|
-|`AAAS_WEB_DIR`|web/dist|静态 UI 目录|
+|`TRIGGER_PORT`|7788|HTTP 端口|
+|`TRIGGER_HOST`|127.0.0.1|绑定地址|
+|`TRIGGER_DATA_DIR`|./data|SQLite 与运行日志|
+|`TRIGGER_JOBS_DIR`|./jobs|YAML 任务目录|
+|`TRIGGER_DEFAULT_TZ`|Asia/Shanghai|cron 默认时区|
+|`TRIGGER_MAX_CONCURRENCY`|2|全局并发上限|
+|`TRIGGER_TICK_MS`|1000|调度 tick|
+|`TRIGGER_PI_BIN`|pi|pi 可执行文件|
+|`TRIGGER_WEB_DIR`|web/dist|静态 UI 目录|
 
 ## 开发
 
@@ -165,7 +165,7 @@ make ci-local-full   # 上面全部 + 重建 QA 镜像
 只碰 pi 适配器 / provider / 模型参数时，额外跑真实模型：
 
 ```bash
-make e2e-real        # AAAS_E2E_PI=real，走真实 pi（在宿主，需要接入点）
+make e2e-real        # TRIGGER_E2E_PI=real，走真实 pi（在宿主，需要接入点）
 ```
 
 只碰前端或容器时：

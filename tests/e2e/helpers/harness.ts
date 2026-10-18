@@ -1,6 +1,6 @@
 /**
  * E2E harness: boots the REAL engine (src/server/main.ts) as a subprocess and
- * talks to it over HTTP, exactly like the Web UI and `aaas` CLI do.
+ * talks to it over HTTP, exactly like the Web UI and `trigger` CLI do.
  *
  * Why a subprocess and not `app.inject()`:
  *   `app.inject()` bypasses listen(), TCP, SSE flushing, SIGTERM shutdown and
@@ -8,7 +8,7 @@
  *   therefore gets a real port, a real data dir and a process that must exit
  *   cleanly.
  *
- * The pi binary is swappable via AAAS_PI_BIN, which the engine already honours:
+ * The pi binary is swappable via TRIGGER_PI_BIN, which the engine already honours:
  *   fake  — tests/e2e/fixtures/fake-pi.mjs; offline, deterministic, runs the
  *           real adapter (spawn + JSONL RPC) with the model stubbed out. CI-safe.
  *   real  — the `pi` on PATH; needs credentials and an endpoint. Local/QA only.
@@ -31,7 +31,7 @@ export const repoRoot = resolve(here, "..", "..", "..");
 export const FAKE_PI = join(repoRoot, "tests", "e2e", "fixtures", "fake-pi.mjs");
 
 /**
- * The engine honours AAAS_PI_BIN, so the fake pi is handed over as a real
+ * The engine honours TRIGGER_PI_BIN, so the fake pi is handed over as a real
  * executable: chmod +x once, then spawn it directly. (It carries a `node`
  * shebang, so there is no wrapper script to keep in sync.)
  *
@@ -46,23 +46,23 @@ export function useFakePi(): string {
 }
 
 /** Default model for real-pi runs; override per environment. */
-export const DEFAULT_MODEL = process.env.AAAS_E2E_MODEL ?? "workbuddy/hy4-preview-ioa";
-export const DEFAULT_PROVIDER = process.env.AAAS_E2E_PROVIDER ?? "any-endpoint";
+export const DEFAULT_MODEL = process.env.TRIGGER_E2E_MODEL ?? "workbuddy/hy4-preview-ioa";
+export const DEFAULT_PROVIDER = process.env.TRIGGER_E2E_PROVIDER ?? "any-endpoint";
 
 export type PiMode = "fake" | "real";
 
-/** True when the caller asked for real pi (AAAS_E2E_PI=real). */
+/** True when the caller asked for real pi (TRIGGER_E2E_PI=real). */
 export function wantsRealPi(): boolean {
-  return process.env.AAAS_E2E_PI === "real";
+  return process.env.TRIGGER_E2E_PI === "real";
 }
 
 /** Fail loudly instead of silently testing with a fake. */
 export function requireRealPi(): void {
-  if (!wantsRealPi()) throw new Error("this test needs AAAS_E2E_PI=real (a model endpoint)");
+  if (!wantsRealPi()) throw new Error("this test needs TRIGGER_E2E_PI=real (a model endpoint)");
 }
 
 export interface BootOptions {
-  /** Which pi binary the engine spawns. Defaults to fake, or real if AAAS_E2E_PI=real. */
+  /** Which pi binary the engine spawns. Defaults to fake, or real if TRIGGER_E2E_PI=real. */
   pi?: PiMode;
   /** Built web assets to serve; `null` forces "ui not built". Default: web/dist if present. */
   webDir?: string | null;
@@ -106,7 +106,7 @@ export async function health(baseUrl: string, timeoutMs = 2000): Promise<{ ok: b
 
 export async function bootEngine(options: BootOptions = {}): Promise<Engine> {
   const pi: PiMode = options.pi ?? (wantsRealPi() ? "real" : "fake");
-  const dir = mkdtempSync(join(tmpdir(), "aaas-e2e-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-e2e-"));
   const dataDir = join(dir, "data");
   const jobsDir = join(dir, "jobs");
   mkdirSync(dataDir, { recursive: true });
@@ -118,18 +118,18 @@ export async function bootEngine(options: BootOptions = {}): Promise<Engine> {
 
   const env: Record<string, string | undefined> = {
     ...process.env,
-    AAAS_PORT: String(port),
-    AAAS_HOST: "127.0.0.1",
-    AAAS_DATA_DIR: dataDir,
-    AAAS_JOBS_DIR: jobsDir,
-    AAAS_TICK_MS: "200",
-    AAAS_DEFAULT_TZ: "Asia/Shanghai",
-    AAAS_MAX_CONCURRENCY: "4",
+    TRIGGER_PORT: String(port),
+    TRIGGER_HOST: "127.0.0.1",
+    TRIGGER_DATA_DIR: dataDir,
+    TRIGGER_JOBS_DIR: jobsDir,
+    TRIGGER_TICK_MS: "200",
+    TRIGGER_DEFAULT_TZ: "Asia/Shanghai",
+    TRIGGER_MAX_CONCURRENCY: "4",
     NO_COLOR: "1",
     ...(pi === "fake"
-      ? { AAAS_PI_BIN: useFakePi() }
-      : { AAAS_PI_BIN: process.env.AAAS_E2E_PI_BIN || "pi" }),
-    ...(webDir ? { AAAS_WEB_DIR: webDir } : { AAAS_WEB_DIR: "" }),
+      ? { TRIGGER_PI_BIN: useFakePi() }
+      : { TRIGGER_PI_BIN: process.env.TRIGGER_E2E_PI_BIN || "pi" }),
+    ...(webDir ? { TRIGGER_WEB_DIR: webDir } : { TRIGGER_WEB_DIR: "" }),
     ...options.env,
   };
 

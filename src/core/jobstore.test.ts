@@ -35,7 +35,7 @@ function makeStore(dir: string): JobStore {
 }
 
 function tempDir(): string {
-  return mkdtempSync(join(tmpdir(), "aaas-jobs-"));
+  return mkdtempSync(join(tmpdir(), "trigger-jobs-"));
 }
 
 const validSpec = (overrides: Partial<JobSpec> = {}): JobSpec => ({

@@ -80,7 +80,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       queued: runningIds.filter((r) => r.status === "queued").length,
       jobs: all.length,
       enabledJobs: all.filter((j) => j.spec.enabled !== false && !j.problem).length,
-      maxConcurrency: Number(process.env.AAAS_MAX_CONCURRENCY ?? 2),
+      maxConcurrency: Number(process.env.TRIGGER_MAX_CONCURRENCY ?? 2),
       defaultTimezone: deps.defaultTimezone,
       startedAt: deps.startedAt,
     };

@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 /**
- * Dev server proxies `/api` to the aaas engine (contract §5).
+ * Dev server proxies `/api` to the trigger engine (contract §5).
  *
  * SSE deliberately has no buffering setting here: the proxy pipes the upstream
  * response straight through, and the server already sends

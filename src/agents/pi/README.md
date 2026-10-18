@@ -1,7 +1,7 @@
 # `pi` agent adapter
 
 Runs the [`pi`](https://github.com/earendil-works/pi) coding agent as a child
-process and folds its output into an aaas `AgentRunResult`.
+process and folds its output into an trigger `AgentRunResult`.
 
 ```text
 src/agents/pi/index.ts       AgentAdapter (validate → buildPiArgs → run)

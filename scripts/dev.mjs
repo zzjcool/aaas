@@ -55,6 +55,6 @@ process.on("SIGTERM", () => shutdown(0));
 // left over from a monorepo template: neither ever existed in this repo, so
 // `npm run dev` died instantly with ERR_MODULE_NOT_FOUND on the very first
 // command a newcomer runs. Use the real entrypoints and run vite from web/.
-run("server", "npx", ["tsx", "watch", "src/server/main.ts"], { env: { AAAS_DEV: "1", AAAS_PORT: "7788" } });
+run("server", "npx", ["tsx", "watch", "src/server/main.ts"], { env: { TRIGGER_DEV: "1", TRIGGER_PORT: "7788" } });
 // vite must run from web/: its config, index.html and deps live there.
 run("web", "npx", ["vite"], { cwd: "web" });

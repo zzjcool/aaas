@@ -1,4 +1,4 @@
-# aaas v1 — 冻结契约
+# trigger v1 — 冻结契约
 
 > 本文件是并行施工的唯一接口依据。**不要自行修改本文件**；如遇矛盾，向父会话报告。
 
@@ -145,7 +145,7 @@ SSE 帧格式：`data: <JSON of SseEvent>\n\n`（每 15s 一个 ping）。校验
 
 ## 6. 引擎语义（默认值，勿改）
 
-- 全局并发 2（`AAAS_MAX_CONCURRENCY`）；单 job 默认不并发（`allowOverlap:false`）。
+- 全局并发 2（`TRIGGER_MAX_CONCURRENCY`）；单 job 默认不并发（`allowOverlap:false`）。
 - 单次超时 30min（`timeoutMs`），失败重试 1 次，指数退避 30s。
 - 进程重启**不补跑**错过的时刻，只记一条 `skipped` 运行记录（`error: "missed while engine was down"`）。
   - 判定：`scheduledFor < engineStart - 60s` 的待触发点直接跳过。
@@ -154,20 +154,20 @@ SSE 帧格式：`data: <JSON of SseEvent>\n\n`（每 15s 一个 ping）。校验
 
 ## 7. 数据落盘
 
-- SQLite：`data/aaas.db`（`node:sqlite`，无需原生编译）。
+- SQLite：`data/trigger.db`（`node:sqlite`，无需原生编译）。
 - 运行日志：`data/runs/<runId>.jsonl`，每行 `{"at":<epoch>,"stream":"stdout","line":"..."}`。
-- Job 声明：`jobs/*.yaml`（可配置 `AAAS_JOBS_DIR`），文件即真相源；API 写入也回写 YAML。
+- Job 声明：`jobs/*.yaml`（可配置 `TRIGGER_JOBS_DIR`），文件即真相源；API 写入也回写 YAML。
 
 ## 8. 环境变量
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `AAAS_PORT` | 7788 | HTTP 端口 |
-| `AAAS_HOST` | 127.0.0.1 | 绑定地址 |
-| `AAAS_DATA_DIR` | ./data | DB、日志 |
-| `AAAS_JOBS_DIR` | ./jobs | YAML 目录 |
-| `AAAS_DEFAULT_TZ` | Asia/Shanghai | cron 默认时区 |
-| `AAAS_MAX_CONCURRENCY` | 2 | 全局并发 |
-| `AAAS_PI_BIN` | `pi` | pi 可执行路径 |
-| `AAAS_TICK_MS` | 1000 | 调度 tick |
-| `AAAS_WEB_DIR` | web/dist | 静态资源目录（存在才挂载） |
+| `TRIGGER_PORT` | 7788 | HTTP 端口 |
+| `TRIGGER_HOST` | 127.0.0.1 | 绑定地址 |
+| `TRIGGER_DATA_DIR` | ./data | DB、日志 |
+| `TRIGGER_JOBS_DIR` | ./jobs | YAML 目录 |
+| `TRIGGER_DEFAULT_TZ` | Asia/Shanghai | cron 默认时区 |
+| `TRIGGER_MAX_CONCURRENCY` | 2 | 全局并发 |
+| `TRIGGER_PI_BIN` | `pi` | pi 可执行路径 |
+| `TRIGGER_TICK_MS` | 1000 | 调度 tick |
+| `TRIGGER_WEB_DIR` | web/dist | 静态资源目录（存在才挂载） |

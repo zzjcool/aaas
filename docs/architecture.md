@@ -1,4 +1,4 @@
-# aaas 架构
+# trigger 架构
 
 ## 数据流
 
@@ -63,7 +63,7 @@ interface AgentAdapter {
 
 **后端只存 epoch 毫秒。** 时区在且仅在两处出现：
 
-1. 把 cron 表达式翻译成下次触发时刻时（`CronTriggerConfig.timezone`，缺省 `AAAS_DEFAULT_TZ`）。
+1. 把 cron 表达式翻译成下次触发时刻时（`CronTriggerConfig.timezone`，缺省 `TRIGGER_DEFAULT_TZ`）。
 2. 前端渲染时（浏览器本地时区 + job 声明的时区并排展示）。
 
 因此：
@@ -82,7 +82,7 @@ interface AgentAdapter {
 
 这样做的理由：定时任务的语义是「在时间点上做事」，不是「补做所有错过的事」。一次 3 天的停机如果补跑，会在重启瞬间炸出数百个并发 agent 进程，比漏跑更糟。
 
-`missedGraceMs` 可调（`AAAS_MISSED_GRACE_MS`），想严格不补跑就设 0。
+`missedGraceMs` 可调（`TRIGGER_MISSED_GRACE_MS`），想严格不补跑就设 0。
 
 ## 失败与恢复
 
@@ -97,7 +97,7 @@ interface AgentAdapter {
 
 ## 存储
 
-- `data/aaas.db`：`runs`（运行记录）、`job_state`（每 job 的 `last_fire`）、`meta`。
+- `data/trigger.db`：`runs`（运行记录）、`job_state`（每 job 的 `last_fire`）、`meta`。
 - `data/runs/<runId>.jsonl`：每行 `{"at":epoch,"stream":"stdout","line":"..."}`，与 DB 里的 `log_path` 对应。
 - 用 `node:sqlite`（Node 22+ 内置），**没有原生编译步骤**，换机器 `npm install` 不会卡在 node-gyp。
 

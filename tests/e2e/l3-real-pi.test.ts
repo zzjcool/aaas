@@ -1,19 +1,19 @@
 /**
  * L3 E2E — the real `pi` binary against a real model endpoint.
  *
- * Runs ONLY when AAAS_E2E_PI=real. Everything here would be a lie with the fake
+ * Runs ONLY when TRIGGER_E2E_PI=real. Everything here would be a lie with the fake
  * pi, so the suite refuses to run rather than silently passing: a green L3 means
- * aaas really drove `pi --mode rpc` to a real model and stored its answer.
+ * trigger really drove `pi --mode rpc` to a real model and stored its answer.
  *
  * Why it exists:
  *   L1/L2 prove the plumbing. They cannot prove that argv, extension loading,
  *   credentials and the provider handshake still line up with the pi release
  *   that is actually installed. That is exactly what breaks on upgrade.
  *
- * Local:      AAAS_E2E_PI=real npm run e2e:real
+ * Local:      TRIGGER_E2E_PI=real npm run e2e:real
  * Container:  make e2e-real   (mounts the host's pi config + endpoint auth)
  *
- * Default model: workbuddy/hy4-preview-ioa (override with AAAS_E2E_MODEL).
+ * Default model: workbuddy/hy4-preview-ioa (override with TRIGGER_E2E_MODEL).
  */
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
@@ -21,7 +21,7 @@ import { after, before, describe, test } from "node:test";
 import { bootEngine, DEFAULT_MODEL, DEFAULT_PROVIDER, get, post, waitForRun, type Engine } from "./helpers/harness.ts";
 
 /** Skips the whole suite (rather than each test) when real pi was not requested. */
-const real = process.env.AAAS_E2E_PI === "real";
+const real = process.env.TRIGGER_E2E_PI === "real";
 
 let engine: Engine;
 
@@ -34,12 +34,12 @@ after(async () => {
   await engine?.stop();
 });
 
-describe("L3 · real pi, real model", { skip: !real && "set AAAS_E2E_PI=real" }, () => {
+describe("L3 · real pi, real model", { skip: !real && "set TRIGGER_E2E_PI=real" }, () => {
   test("pi is installed and reachable", async () => {
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const run = promisify(execFile);
-    const bin = process.env.AAAS_E2E_PI_BIN || "pi";
+    const bin = process.env.TRIGGER_E2E_PI_BIN || "pi";
     const { stdout } = await run(bin, ["--version"], { timeout: 30_000 });
     assert.match(stdout, /\d+\.\d+\.\d+/, "pi --version should print a version");
   });
@@ -82,7 +82,7 @@ describe("L3 · real pi, real model", { skip: !real && "set AAAS_E2E_PI=real" },
         tools: [],
         timeoutMs: 120_000,
       },
-      prompt: "Reply with exactly one line: aaas-l3-ok",
+      prompt: "Reply with exactly one line: trigger-l3-ok",
       timeoutMs: 120_000,
       retries: 0,
     });
@@ -93,7 +93,7 @@ describe("L3 · real pi, real model", { skip: !real && "set AAAS_E2E_PI=real" },
 
     const record = await waitForRun(engine, started.body.run.id, 180_000);
     assert.equal(record.status, "succeeded", `${record.error ?? ""}\n${engine.output().slice(-2000)}`);
-    assert.match(record.resultText ?? "", /aaas-l3-ok/i, "the model's answer must be stored verbatim");
+    assert.match(record.resultText ?? "", /trigger-l3-ok/i, "the model's answer must be stored verbatim");
     assert.ok((record.tokens?.total ?? 0) > 0, "a real run reports real token usage");
     // `record.model` is populated from pi's get_state, which does not always
     // answer; the model we asked for is asserted via the transcript below.

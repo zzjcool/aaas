@@ -108,7 +108,7 @@ export function App() {
       <nav className="nav" aria-label="Primary">
         <div className="nav__brand">
           <span className="nav__logo" aria-hidden="true">◈</span>
-          <span className="nav__name">aaas</span>
+          <span className="nav__name">trigger</span>
         </div>
         <ul className="nav__list">
           {TABS.map((item) => (
@@ -172,7 +172,7 @@ export function App() {
 
         <footer className="footer">
           <span>
-            aaas console · engine {health.data?.version ?? "—"}
+            trigger console · engine {health.data?.version ?? "—"}
           </span>
           <span className="muted">
             {health.data ? `${health.data.jobs} jobs · ${health.data.running} running` : "connecting…"}

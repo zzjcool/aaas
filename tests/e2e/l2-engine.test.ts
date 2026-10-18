@@ -171,20 +171,20 @@ describe("L2 · streaming and UI serving", () => {
   });
 
   test("the built UI is served with an SPA fallback while /api stays JSON", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "aaas-l2-ui-"));
+    const dir = mkdtempSync(join(tmpdir(), "trigger-l2-ui-"));
     const dist = join(dir, "dist");
     mkdirSync(dist, { recursive: true });
-    writeFileSync(join(dist, "index.html"), "<!doctype html><title>aaas ui</title>", "utf8");
+    writeFileSync(join(dist, "index.html"), "<!doctype html><title>trigger ui</title>", "utf8");
 
     const ui = await bootEngine({ pi: "fake", webDir: dist });
     try {
       const root = await get(ui, "/");
       assert.equal(root.status, 200);
-      assert.match(root.text, /aaas ui/);
+      assert.match(root.text, /trigger ui/);
 
       const deep = await get(ui, "/runs/anything");
       assert.equal(deep.status, 200, "client-side routes must fall back to index.html");
-      assert.match(deep.text, /aaas ui/);
+      assert.match(deep.text, /trigger ui/);
 
       const apiMiss = await get(ui, "/api/nope");
       assert.equal(apiMiss.status, 404);

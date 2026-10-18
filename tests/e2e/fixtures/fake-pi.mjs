@@ -5,10 +5,10 @@
  *
  * Why not a stub AgentAdapter instead?
  *   Because a stub adapter would stop testing the adapter. Pointing
- *   `AAAS_PI_BIN` at this file keeps every layer real — spawn, argv building,
+ *   `TRIGGER_PI_BIN` at this file keeps every layer real — spawn, argv building,
  *   the JSONL protocol, abort/timeout escalation, transcript logging, token
  *   accounting, session reads — and only replaces the model at the very end of
- *   the chain. That is the difference between "the API works" and "aaas works".
+ *   the chain. That is the difference between "the API works" and "trigger works".
  *
  * Behaviour is selected with FAKE_PI_MODE (default "ok"):
  *   ok          streams text, one tool call, settles successfully
@@ -22,7 +22,7 @@
  *   models      only answers get_available_models (discovery path)
  *
  * Any line written to FAKE_PI_ARGV_FILE records argv, so tests can assert what
- * aaas actually passed to pi (--model, --provider, --tools, ...).
+ * trigger actually passed to pi (--model, --provider, --tools, ...).
  */
 import { appendFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";

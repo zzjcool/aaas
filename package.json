@@ -1,15 +1,15 @@
 {
-  "name": "aaas",
+  "name": "trigger",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Agent-as-a-Service: plugin-based triggers (cron / manual / webhook) that drive coding agents (pi / ...)",
+  "description": "Trigger-driven agent service: plugin-based triggers (cron / manual / webhook) that drive coding agents (pi / ...)",
   "engines": {
     "node": ">=22.19"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:server": "AAAS_DEV=1 tsx watch src/server/main.ts",
+    "dev:server": "TRIGGER_DEV=1 tsx watch src/server/main.ts",
     "dev:web": "npm --prefix web run dev",
     "start": "tsx src/server/main.ts",
     "cli": "tsx src/cli.ts",

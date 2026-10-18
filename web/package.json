@@ -1,5 +1,5 @@
 {
-  "name": "@aaas/web",
+  "name": "@trigger/web",
   "private": true,
   "type": "module",
   "scripts": {

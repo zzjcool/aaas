@@ -17,10 +17,10 @@ import { createEchoAdapter } from "./echo-adapter.ts";
 const TZ = "Asia/Shanghai";
 
 function harness(webDir: string | null) {
-  const dir = mkdtempSync(join(tmpdir(), "aaas-static-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-static-"));
   const dataDir = join(dir, "data");
   const jobsDir = join(dir, "jobs");
-  const db = new Db(join(dataDir, "aaas.db"));
+  const db = new Db(join(dataDir, "trigger.db"));
   const logs = new LogStore(dataDir);
   const bus = new EventBus();
   const triggers = new TriggerRegistry();
@@ -51,7 +51,7 @@ test("built UI is served with an SPA fallback while /api keeps returning JSON 40
   const h = harness(null);
   const staticDir = join(h.dir, "dist");
   mkdirSync(staticDir, { recursive: true });
-  writeFileSync(join(staticDir, "index.html"), "<!doctype html><title>aaas</title>", "utf8");
+  writeFileSync(join(staticDir, "index.html"), "<!doctype html><title>trigger</title>", "utf8");
   const app = await buildApp({
     ...h,
     webDir: staticDir,
@@ -62,11 +62,11 @@ test("built UI is served with an SPA fallback while /api keeps returning JSON 40
   try {
     const root = await app.inject({ method: "GET", url: "/" });
     assert.equal(root.statusCode, 200);
-    assert.match(root.body, /aaas/);
+    assert.match(root.body, /trigger/);
 
     const deepLink = await app.inject({ method: "GET", url: "/runs/whatever" });
     assert.equal(deepLink.statusCode, 200);
-    assert.match(deepLink.body, /aaas/, "client-side routes must fall back to index.html");
+    assert.match(deepLink.body, /trigger/, "client-side routes must fall back to index.html");
 
     const apiMiss = await app.inject({ method: "GET", url: "/api/nope" });
     assert.equal(apiMiss.statusCode, 404);

@@ -7,8 +7,8 @@ name: CI
 #   - QA 镜像能构建 + 容器自检通过
 #
 # 不跑真实模型：GitHub Runner 访问不到宿主的接入点。真实模型验证走本地
-# `make e2e-real`（AAAS_E2E_PI=real），或 QA 容器 `make qa-up`。
-# L3 测试文件会在缺少 AAAS_E2E_PI=real 时整体 skip，此处自然跳过。
+# `make e2e-real`（TRIGGER_E2E_PI=real），或 QA 容器 `make qa-up`。
+# L3 测试文件会在缺少 TRIGGER_E2E_PI=real 时整体 skip，此处自然跳过。
 
 on:
   pull_request:
@@ -63,7 +63,8 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: coverage
           path: coverage/
@@ -112,7 +113,7 @@ jobs:
           persist-credentials: false
 
       - name: Build image
-        run: docker build -t aaas-qa:ci -f docker/Dockerfile docker
+        run: docker build -t trigger-qa:ci -f docker/Dockerfile docker
 
       # 不挂载宿主凭据也能验证的部分：pi 在、插件在、工具链在、入口脚本语法正确。
       # 接入点相关的自检在容器启动时才有意义，那里需要 --network=host + 凭据。
@@ -136,7 +137,7 @@ jobs:
           # swallow `bash /tmp/selfcheck.sh` as its own arguments.
           docker run --rm --entrypoint bash \
             -v /tmp/selfcheck.sh:/tmp/selfcheck.sh:ro \
-            aaas-qa:ci /tmp/selfcheck.sh
+            trigger-qa:ci /tmp/selfcheck.sh
 
       - name: Entrypoint syntax + mount preflight fails closed
         run: |
@@ -144,8 +145,8 @@ jobs:
           bash -n docker/entrypoint.sh
           bash -n docker/wait-ready.sh
           # No source mount must fail loudly, not start a half-broken server.
-          out="$(docker run --rm aaas-qa:ci \
-            /usr/local/bin/aaas-entrypoint.sh 2>&1 || true)"
+          out="$(docker run --rm trigger-qa:ci \
+            /usr/local/bin/trigger-entrypoint.sh 2>&1 || true)"
           case "$out" in
             *"/app"*)
               echo "OK  entrypoint fails closed without a mount"

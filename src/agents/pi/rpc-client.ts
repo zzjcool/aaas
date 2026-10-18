@@ -164,7 +164,7 @@ export class PiRpcProcess {
     if (this.#exited || !this.#child) {
       return Promise.reject(new Error(`pi process is not running (command: ${type})`));
     }
-    const id = `aaas-${++this.#seq}`;
+    const id = `trigger-${++this.#seq}`;
     return new Promise<RpcResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(id);
@@ -314,7 +314,7 @@ export class PiRpcProcess {
     this.#streamBytes += Buffer.byteLength(chunk);
     if (this.#streamBytes > MAX_STREAM_BYTES && !this.#truncated) {
       this.#truncated = true;
-      this.#emitStderr(`[aaas] stdout exceeded ${MAX_STREAM_BYTES} bytes; further records are dropped (still draining)`);
+      this.#emitStderr(`[trigger] stdout exceeded ${MAX_STREAM_BYTES} bytes; further records are dropped (still draining)`);
     }
     this.#stdoutBuf += chunk;
     // LF-only framing. Never `readline`: it also splits on U+2028/U+2029.
@@ -333,7 +333,7 @@ export class PiRpcProcess {
       // Bound memory: drop the oversized partial record and resync on the next LF.
       this.#discardingLine = true;
       this.#stdoutBuf = "";
-      this.#emitStderr(`[aaas] dropped a stdout record longer than ${MAX_LINE_BYTES} bytes`);
+      this.#emitStderr(`[trigger] dropped a stdout record longer than ${MAX_LINE_BYTES} bytes`);
     }
   }
 
@@ -371,7 +371,7 @@ export class PiRpcProcess {
     try {
       record = JSON.parse(line) as RpcRecord;
     } catch {
-      this.#emitStderr(`[aaas] non-JSON stdout line ignored: ${line.slice(0, 200)}`);
+      this.#emitStderr(`[trigger] non-JSON stdout line ignored: ${line.slice(0, 200)}`);
       return;
     }
     if (typeof record !== "object" || record === null) return;

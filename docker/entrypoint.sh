@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aaas QA 容器入口。
+# trigger QA 容器入口。
 #
 # 职责（按顺序）：
 #   1. 自检宿主挂载是否齐全（源码 / pi 认证 / 模型目录）—— 缺一样就明确报错，
@@ -9,14 +9,14 @@
 #   4. exec 启动服务（保持 PID 1，这样 SIGTERM 能干净关停）。
 set -euo pipefail
 
-PORT="${AAAS_PORT:-7788}"
-MODEL="${AAAS_E2E_MODEL:-workbuddy/hy4-preview-ioa}"
-PROVIDER="${AAAS_E2E_PROVIDER:-any-endpoint}"
+PORT="${TRIGGER_PORT:-7788}"
+MODEL="${TRIGGER_E2E_MODEL:-workbuddy/hy4-preview-ioa}"
+PROVIDER="${TRIGGER_E2E_PROVIDER:-any-endpoint}"
 
-log()  { printf '[aaas-qa] %s\n' "$*"; }
-fail() { printf '[aaas-qa] ✖ %s\n' "$*" >&2; exit 1; }
+log()  { printf '[trigger-qa] %s\n' "$*"; }
+fail() { printf '[trigger-qa] ✖ %s\n' "$*" >&2; exit 1; }
 
-log "aaas QA container starting"
+log "trigger QA container starting"
 
 # ── 1. 挂载自检 ────────────────────────────────────────────────
 [ -f /app/package.json ]     || fail "源码未挂载到 /app（make qa-up 会挂载 \$SRC:/app:ro）"
@@ -31,18 +31,18 @@ log "pi $(pi --version 2>&1 | head -1)"
 # ── 2. 依赖 + 前端 ─────────────────────────────────────────────
 # node_modules 在 volume 上做缓存：源码是只读挂载，装不了也写不进去。
 cd /app
-if [ ! -d node_modules/.bin ] || [ ! -f node_modules/.aaas-install-stamp ]; then
+if [ ! -d node_modules/.bin ] || [ ! -f node_modules/.trigger-install-stamp ]; then
   log "安装后端依赖（首次较慢，之后走 volume 缓存）"
   npm ci --no-audit --no-fund
-  touch node_modules/.aaas-install-stamp
+  touch node_modules/.trigger-install-stamp
 else
   log "复用已缓存的后端依赖"
 fi
 
-if [ ! -d web/node_modules/.bin ] || [ ! -f web/node_modules/.aaas-install-stamp ]; then
+if [ ! -d web/node_modules/.bin ] || [ ! -f web/node_modules/.trigger-install-stamp ]; then
   log "安装前端依赖"
   npm --prefix web ci --no-audit --no-fund
-  touch web/node_modules/.aaas-install-stamp
+  touch web/node_modules/.trigger-install-stamp
 fi
 
 # QA 要看的就是当前源码的 UI，所以 dist 必须对源码保持新鲜。
@@ -112,5 +112,5 @@ if [ -d /app/jobs ]; then
 fi
 
 # ── 4. 启动 ────────────────────────────────────────────────────
-log "启动 aaas on 0.0.0.0:${PORT}"
+log "启动 trigger on 0.0.0.0:${PORT}"
 exec node --import tsx src/server/main.ts

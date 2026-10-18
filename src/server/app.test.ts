@@ -17,10 +17,10 @@ import { manualTrigger } from "../triggers/manual.ts";
 const TZ = "Asia/Shanghai";
 
 function makeHarness() {
-  const dir = mkdtempSync(join(tmpdir(), "aaas-api-"));
+  const dir = mkdtempSync(join(tmpdir(), "trigger-api-"));
   const dataDir = join(dir, "data");
   const jobsDir = join(dir, "jobs");
-  const db = new Db(join(dataDir, "aaas.db"));
+  const db = new Db(join(dataDir, "trigger.db"));
   const logs = new LogStore(dataDir);
   const bus = new EventBus();
 

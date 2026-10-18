@@ -9,7 +9,7 @@ import { EventBus, LogStore } from "./events.ts";
 import { Runner } from "./runner.ts";
 
 function tempDir(): string {
-  return mkdtempSync(join(tmpdir(), "aaas-runner-"));
+  return mkdtempSync(join(tmpdir(), "trigger-runner-"));
 }
 
 function makeJob(overrides: Partial<JobSpec> = {}): JobSpec {
@@ -53,7 +53,7 @@ function fakeAdapter(impl: (input: AgentRunInput) => Promise<AgentRunResult> | A
  */
 function setup(adapter: FakeAdapter, runnerOptions: { retryDelayFloorMs?: number } = {}) {
   const dir = tempDir();
-  const db = new Db(join(dir, "aaas.db"));
+  const db = new Db(join(dir, "trigger.db"));
   const logs = new LogStore(dir);
   const bus = new EventBus();
   const runner = new Runner({
